@@ -12,7 +12,7 @@ Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller
 Das System ist für einen Raspberry Pi 3 mit offiziellem 7-Zoll-Display als dauerhaft laufendes Kiosk-Display im Heimnetz gedacht.  
 Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone im gleichen WLAN.
 
-![Mein Aufbau](docs/media/rpi-oberflaeche.jpg)
+![Mein Aufbau](docs/media/rpi-oberflaeche-qr.jpg)
 
 Foto der RPi Oberfläche
 
