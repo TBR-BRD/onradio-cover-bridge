@@ -14,6 +14,8 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 
 ![Mein Aufbau](docs/media/rpi-oberflaeche.jpg)
 
+Foto der RPi Oberfläche
+
 ## Highlights
 
 - Internetradio-Steuerung per Smartphone im Heimnetz
