@@ -5,7 +5,7 @@ Diese Anleitung installiert die aktuelle Version des Projekts auf einem frisch i
 Die Anleitung geht davon aus:
 
 - Benutzername auf dem Pi: `pi`
-- IP-Adresse des Pi: `192.168.42.212`
+- IP-Adresse des Pi: `192.168.xx.yy`
 - Das ZIP liegt auf dem Mac unter `~/Downloads/onradio-cover-bridge-feature-pack.zip`
 
 ## 1. Raspberry Pi OS installieren
@@ -36,8 +36,8 @@ hostname -I
 Auf dem Mac:
 
 ```bash
-scp ~/Downloads/onradio-cover-bridge-feature-pack.zip pi@192.168.42.212:~
-ssh pi@192.168.42.212
+scp ~/Downloads/onradio-cover-bridge-feature-pack.zip pi@192.168.xx.yy:~
+ssh pi@192.168.xx.yy
 ```
 
 ## 4. Projekt entpacken und nach /opt kopieren
@@ -71,7 +71,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 
 Testen:
 
-- Mobile, Tablet oder Mac: `http://192.168.42.212:8080/controller`
+- Mobile, Tablet oder Mac: `http://192.168.xx.yy:8080/controller`
 - Pi: `http://127.0.0.1:8080/display`
 
 Dann mit `Ctrl+C` wieder beenden.
@@ -94,7 +94,7 @@ sudo nano /etc/systemd/system/onradio-cover.service
 Im `[Service]`-Block ergänzen:
 
 ```ini
-Environment=CONTROLLER_URL_OVERRIDE=http://192.168.42.212:8080/controller
+Environment=CONTROLLER_URL_OVERRIDE=http://192.168.xx.yy:8080/controller
 ```
 
 Danach:
@@ -158,7 +158,7 @@ sudo reboot
 - Auf dem Mobile, Tablet oder Mac steuerst du das System über:
 
 ```text
-http://192.168.42.212:8080/controller
+http://192.168.xx.yy:8080/controller
 ```
 
 ## 14. WLAN-Lautsprecher (UPnP) nutzen
