@@ -1,0 +1,3 @@
+# Allow the onradio-cover service user to power off the Raspberry Pi without a password.
+# Restrict this to the exact poweroff command only.
+pi ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff, /bin/systemctl poweroff

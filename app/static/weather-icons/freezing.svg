@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gefrierender Regen">
+  <g fill="none" stroke="#F4F7FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 31c-5.1 0-9.2-3.7-9.2-8.3 0-4.2 3.3-7.6 7.5-8 1.8-5.2 6.7-8.6 12.4-8.6 7.2 0 13.1 5.4 13.6 12.3 4.5.3 8 3.9 8 8.3 0 4.6-3.9 8.4-8.7 8.4H18z" fill="#F4F7FF" fill-opacity="0.18"/>
+    <path d="M23 41l-3 8M33 41l-3 8"/>
+    <path d="M43 43v8M39 47h8M40.5 44.5l5 5M45.5 44.5l-5 5"/>
+  </g>
+</svg>

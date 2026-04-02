@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mobile Radio-Steuerung</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260322a">
+</head>
+<body class="controller-body">
+  <main class="controller-shell controller-shell-mobile">
+    <section class="panel controller-panel controller-panel-mobile">
+      <div class="controller-hero">
+        <div class="controller-hero-copy">
+          <p class="eyebrow">Steuerung auf dem Mobile</p>
+          <h1>Radio-Steuerung</h1>
+          <p class="controller-subtitle">Sender direkt antippen, Wiedergabe starten, Raspberry Pi konfigurieren und Audio, WLAN-Lautsprecher, Anzeige, Selbsttest, Sicherungen und Updates zentral verwalten.</p>
+        </div>
+
+        <div class="controller-top-meta">
+          <div class="controller-weather-summary panel-soft-card">
+            <div class="controller-weather-icon-wrap">
+              <img id="controllerWeatherIcon" class="controller-weather-icon hidden" src="" alt="Wettersymbol">
+            </div>
+            <div class="controller-weather-copy">
+              <div id="controllerWeatherLocation" class="controller-weather-location">Falkensee</div>
+              <div id="controllerWeatherCondition" class="controller-weather-condition">Wetter wird geladen</div>
+              <div class="controller-weather-facts">
+                <span id="controllerWeatherTemp">-- °C</span>
+                <span id="controllerWeatherPressure">Luftdruck -- hPa</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="controller-clock-card panel-soft-card">
+            <div id="controllerTime" class="controller-clock-time">--:--</div>
+            <div id="controllerDate" class="controller-clock-date">--</div>
+          </div>
+
+          <span id="statusBadge" class="badge controller-status-badge">Bereit</span>
+        </div>
+      </div>
+
+      <div class="controller-main-grid">
+        <section class="controller-station-panel">
+          <div class="controller-subheader">
+            <h2>Sender</h2>
+            <p>Direkt antippen</p>
+          </div>
+          <div id="stationList" class="station-list" role="listbox" aria-label="Senderliste"></div>
+        </section>
+
+        <section class="controller-content-panel">
+          <div class="controller-toolbar controller-toolbar-stacked">
+            <div class="button-row">
+              <button id="playButton" class="primary-button">Play</button>
+              <button id="refreshButton" class="secondary-button">Metadaten neu laden</button>
+            </div>
+
+            <div class="controller-toolbar-grid">
+              <label class="field volume-field">
+                <span>Mobile-Lautstärke</span>
+                <input id="volumeSlider" type="range" min="0" max="1" step="0.01" value="0.9">
+              </label>
+
+              <label class="field volume-field">
+                <span>Ausgabe-Lautstärke</span>
+                <input id="localVolumeSlider" type="range" min="0" max="100" step="1" value="50">
+              </label>
+            </div>
+
+            <div class="button-row compact-button-row">
+              <button id="localMuteButton" class="secondary-button">Stumm</button>
+              <button id="localVolDownButton" class="secondary-button">-5%</button>
+              <button id="localVolUpButton" class="secondary-button">+5%</button>
+            </div>
+            <p id="localAudioSummary" class="controller-inline-note">Ausgabe wird geladen…</p>
+          </div>
+
+          <audio id="player" preload="none"></audio>
+
+          <div class="now-playing-card controller-now-playing-card controller-now-playing-card-mobile">
+            <div class="cover-column">
+              <img id="coverImage" class="cover-preview animated-switch-target" src="/static/kein-cover.svg?v=20260317b" alt="Albumcover">
+            </div>
+            <div class="meta-column animated-switch-target" id="controllerMetaCard">
+              <p id="stationName" class="station-name">-</p>
+              <h2 id="trackTitle" class="track-title">Noch kein Titel</h2>
+              <p id="trackArtist" class="track-artist">Bitte Sender wählen und Play drücken.</p>
+              <div class="meta-row">
+                <span id="playedAt" class="meta-pill">--:-- Uhr</span>
+                <span id="coverSource" class="meta-pill">Cover: -</span>
+              </div>
+              <p id="errorText" class="error-text hidden"></p>
+            </div>
+          </div>
+
+          <div class="hint-box controller-hint-box">
+            Diese Seite ist für Smartphone oder Tablet gedacht. Die Raspberry-Pi-Anzeige läuft separat unter <code>{{ display_url }}</code>.
+          </div>
+        </section>
+      </div>
+
+      <section class="controller-admin-grid">
+        <article class="panel-soft-card admin-card">
+          <div class="controller-subheader">
+            <h2>Audio-Ausgabe</h2>
+            <p>Klinke oder WLAN-Lautsprecher (UPnP)</p>
+          </div>
+          <div id="audioOutputs" class="chip-list"></div>
+          <p id="audioOutputsEmpty" class="controller-inline-note hidden">Noch keine Audioausgabe erkannt.</p>
+        </article>
+
+        <article class="panel-soft-card admin-card">
+          <div class="controller-subheader">
+            <h2>WLAN-Lautsprecher (UPnP)</h2>
+            <p>Im Netzwerk suchen und als Ausgabe wählen</p>
+          </div>
+          <div class="button-row compact-button-row">
+            <button id="bluetoothScanButton" class="secondary-button">WLAN-Lautsprecher suchen</button>
+          </div>
+          <p id="bluetoothStatusText" class="controller-inline-note">WLAN-Lautsprecher werden geprüft…</p>
+          <div id="bluetoothDeviceList" class="device-list"></div>
+        </article>
+
+        <article class="panel-soft-card admin-card">
+          <div class="controller-subheader">
+            <h2>Anzeige</h2>
+            <p>Nur im Controller ändern</p>
+          </div>
+          <label class="checkbox-row">
+            <input id="scheduleEnabled" type="checkbox">
+            <span>Anzeige nur zwischen 08:00 und 22:00 aktiv</span>
+          </label>
+          <div class="schedule-grid">
+            <label class="field compact-field">
+              <span>Ein ab</span>
+              <input id="scheduleOnHour" type="number" min="0" max="23" step="1" value="8">
+            </label>
+            <label class="field compact-field">
+              <span>Aus ab</span>
+              <input id="scheduleOffHour" type="number" min="0" max="23" step="1" value="22">
+            </label>
+          </div>
+          <label class="checkbox-row">
+            <input id="transitionsEnabled" type="checkbox">
+            <span>Animierte Übergänge aktiv</span>
+          </label>
+          <div class="button-row compact-button-row">
+            <button id="saveDisplayConfigButton" class="primary-button">Anzeige speichern</button>
+          </div>
+          <p id="scheduleStatusText" class="controller-inline-note">Zeitfenster wird geladen…</p>
+        </article>
+
+        <article class="panel-soft-card admin-card">
+          <div class="controller-subheader">
+            <h2>Selbsttest</h2>
+            <p>Internet, Stream, Audio, UPnP</p>
+          </div>
+          <div class="button-row compact-button-row">
+            <button id="selftestButton" class="secondary-button">Jetzt prüfen</button>
+          </div>
+          <div id="selftestResults" class="selftest-results"></div>
+        </article>
+
+        <article class="panel-soft-card admin-card">
+          <div class="controller-subheader">
+            <h2>Konfiguration</h2>
+            <p>Automatische Sicherungen</p>
+          </div>
+          <div class="button-row compact-button-row">
+            <button id="backupButton" class="secondary-button">Backup jetzt erstellen</button>
+          </div>
+          <p id="backupStatusText" class="controller-inline-note">Backups werden geladen…</p>
+          <div id="backupList" class="backup-list"></div>
+        </article>
+
+        <article class="panel-soft-card admin-card admin-card-wide">
+          <div class="controller-subheader">
+            <h2>Updates</h2>
+            <p>Direkt aus dem Controller</p>
+          </div>
+          <label class="field compact-field">
+            <span>Optionale ZIP-Quelle (nur gemerkt, kein Direktupdate)</span>
+            <input id="updateSourceUrl" type="url" placeholder="https://github.com/.../archive/refs/heads/main.zip">
+          </label>
+          <div class="button-row compact-button-row">
+            <button id="saveUpdateConfigButton" class="secondary-button">Quelle merken</button>
+            <button id="checkUpdateButton" class="secondary-button">Update prüfen</button>
+            <button id="applyUpdateButton" class="primary-button">Update starten</button>
+          </div>
+          <p id="updateStatusText" class="controller-inline-note">Update-Status wird geladen…</p>
+          <div id="updateDetails" class="update-details"></div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
+    window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
+    window.__STATIONS__ = {{ stations | tojson }};
+  </script>
+  <script src="/static/controller.js?v=20260322a"></script>
+</body>
+</html>

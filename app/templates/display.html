@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radio Display</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260322a">
+</head>
+<body class="display-body">
+  <div id="backgroundLayer" class="background-layer"></div>
+  <div id="displaySleepOverlay" class="display-sleep-overlay hidden">
+    <div class="display-sleep-copy">
+      <p class="display-sleep-title">Anzeige ruht</p>
+      <p id="displaySleepText" class="display-sleep-text">Aktiv von 08:00 bis 22:00</p>
+    </div>
+  </div>
+  <main class="display-shell display-shell-stage">
+    <section class="display-stage">
+      <div class="display-cover-column display-cover-column-full">
+        <img id="displayCover" class="display-cover display-cover-full animated-switch-target" src="/static/kein-cover.svg?v=20260317b" alt="Albumcover">
+      </div>
+
+      <section class="display-side-panel">
+        <div class="display-topline display-topline-stage">
+          <p id="displayStationName" class="station-name station-name-stage">Radio Cover Bridge</p>
+          <div class="display-top-actions">
+            <div class="display-button-grid display-button-grid-compact">
+              <button id="prevStationButton" class="display-mini-button" type="button">◀</button>
+              <button id="displayPlayPauseButton" class="display-mini-button" type="button">Play</button>
+              <button id="nextStationButton" class="display-mini-button" type="button">▶</button>
+              <button id="displayMuteButton" class="display-mini-button" type="button">Stumm</button>
+              <button id="displayVolDownButton" class="display-mini-button" type="button">-</button>
+              <button id="displayVolUpButton" class="display-mini-button" type="button">+</button>
+              {% if local_audio_button_enabled %}
+              <button id="localPlayButton" class="display-local-button" type="button" aria-pressed="false">Ausgabe</button>
+              {% endif %}
+              {% if power_button_enabled %}
+              <button id="shutdownButton" class="display-power-button" type="button">RPi aus</button>
+              {% endif %}
+            </div>
+            <span id="backgroundIssueIndicator" class="display-issue-indicator hidden" aria-hidden="true" title="">!</span>
+          </div>
+        </div>
+
+        {% if power_button_enabled %}
+        <p id="shutdownStatus" class="display-power-status hidden" aria-live="polite"></p>
+        {% endif %}
+
+        <div class="display-middle-stack">
+          <div class="display-track-block animated-switch-target" id="displayMetaBlock">
+            <h1 id="displayTitle" class="display-title display-title-stage">Noch kein Titel</h1>
+            <p id="displayArtist" class="display-artist display-artist-stage">Bitte zuerst im Controller einen Sender auswählen.</p>
+            <p id="displayError" class="error-text hidden"></p>
+          </div>
+
+          <section class="display-time-panel display-time-panel-with-qr" aria-label="Uhrzeit und Datum">
+            {% if controller_qr_enabled %}
+            <div id="controllerQrCard" class="controller-qr-card controller-qr-card-inline" aria-label="QR-Code zur Webadresse {{ controller_url }}">
+              {% if controller_qr_available %}
+              <img id="controllerQrImage" class="controller-qr-image" src="/controller-qr.svg" alt="QR-Code zur Webadresse {{ controller_url }}">
+              <div id="controllerQrFallback" class="controller-qr-fallback hidden">{{ controller_host }}</div>
+              {% else %}
+              <div id="controllerQrFallback" class="controller-qr-fallback">{{ controller_host }}</div>
+              {% endif %}
+            </div>
+            {% endif %}
+            <div class="display-time-copy">
+              <p id="displayClock" class="display-clock-large">--:--</p>
+              <p id="displayDate" class="display-date-large">--</p>
+              <p id="displayLocalVolume" class="display-local-volume">RPi: --</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="display-bottom-right">
+          <section id="weatherPanel" class="weather-panel hidden" aria-label="Wetter Falkensee">
+            <div class="weather-panel-header">
+              <div class="weather-header-copy">
+                <p class="weather-eyebrow">Wetter</p>
+                <p id="weatherLocation" class="weather-location">Falkensee</p>
+              </div>
+              <img id="weatherHeaderIcon" class="weather-header-icon hidden" src="" alt="" aria-hidden="true">
+            </div>
+
+            <div id="weatherCurrent" class="weather-current hidden">
+              <div class="weather-current-main">
+                <p class="weather-current-label">Aktuell</p>
+                <p id="weatherCurrentTemp" class="weather-current-temp">--°</p>
+              </div>
+              <div class="weather-current-side">
+                <p id="weatherCurrentCondition" class="weather-current-condition">-</p>
+                <p class="weather-current-pressure-line">
+                  <span id="weatherCurrentPressure" class="weather-current-pressure">Luftdruck: -</span>
+                  <span id="weatherCurrentPressureTrend" class="weather-pressure-trend hidden" aria-hidden="true"></span>
+                </p>
+              </div>
+            </div>
+
+            <div id="weatherDays" class="weather-days"></div>
+            <p id="weatherError" class="weather-error hidden"></p>
+          </section>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  {% if local_audio_button_enabled %}
+  <audio id="localPlayer" preload="none"></audio>
+  {% endif %}
+
+  <script>
+    window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
+    window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
+  </script>
+  <script src="/static/display.js?v=20260322a"></script>
+</body>
+</html>

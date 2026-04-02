@@ -1,0 +1,17 @@
+[Unit]
+Description=ON Radio Cover Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/onradio-cover-bridge
+Environment=HOST=0.0.0.0
+Environment=PORT=8080
+ExecStart=/opt/onradio-cover-bridge/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
