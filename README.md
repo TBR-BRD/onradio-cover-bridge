@@ -9,6 +9,13 @@
 
 Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller**, **Albumcover**, **Uhrzeit**, **Wetter**, **QR-Code** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
 
+**Short English summary:**
+
+**OnRadio Cover Bridge** is a Raspberry Pi–based internet radio and information display for home networks. It runs as a kiosk-style display on a Raspberry Pi with a 7-inch screen and can be controlled from a smartphone. The system shows album covers, track information, time, date, weather, QR access code, and playback status, while streaming audio to WLAN/UPnP speakers such as Sonos or Denon. It is built with FastAPI, Chromium kiosk mode, systemd services, and Python.
+
+[1]: https://github.com/TBR-BRD/onradio-cover-bridge "GitHub - TBR-BRD/onradio-cover-bridge: onradio-cover-bridge · GitHub"
+
+
 <br>
 <a href="https://www.buymeacoffee.com/thoralf.brandt" target="_blank">
   <img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174">
