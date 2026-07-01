@@ -192,5 +192,7 @@ sudo reboot
 - Local Raspberry Pi audio output has been removed.
 - Playback is handled through WLAN/UPnP speakers.
 - Streams that cannot be reliably verified can be removed from the station list.
+- The UPnP stream relay reconnects automatically after upstream stalls; tune it with `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS`, and `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
+- The UPnP playback watchdog restarts unexpectedly stopped WLAN speakers; tune it with `UPNP_PLAYBACK_WATCHDOG_ENABLED` and `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
 - iTunes cover lookup can be configured with `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE`, and `ITUNES_COVER_QUALITY`.
 - For details see `INSTALLATION_EN.md`.

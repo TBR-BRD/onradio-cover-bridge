@@ -209,5 +209,7 @@ sudo reboot
 - Die Audio-Ausgabe am Raspberry Pi selbst wurde entfernt.
 - Die Wiedergabe erfolgt über WLAN-/UPnP-Lautsprecher.
 - Nicht belastbar verifizierte Streams können aus der Senderliste entfernt werden.
+- Der UPnP-Stream-Relay verbindet sich nach Upstream-Aussetzern automatisch neu; einstellbar über `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS` und `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
+- Der UPnP-Wiedergabe-Watchdog startet unerwartet gestoppte WLAN-Lautsprecher neu; einstellbar über `UPNP_PLAYBACK_WATCHDOG_ENABLED` und `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
 - Die iTunes-Coversuche kann über `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE` und `ITUNES_COVER_QUALITY` angepasst werden.
 - Siehe `INSTALLATION_DE.md` für die vollständige Installationsanleitung.

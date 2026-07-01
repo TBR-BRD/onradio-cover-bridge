@@ -11,6 +11,7 @@ import requests
 import shutil
 import socket
 import subprocess
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -117,6 +118,7 @@ class AppServices:
         )
         self.update_service = UpdateService(PROJECT_DIR)
         self.poll_task: asyncio.Task[None] | None = None
+        self.last_upnp_watchdog_attempt_at = 0.0
 
     async def start(self) -> None:
         await asyncio.to_thread(self._ensure_configured_output_applied)
@@ -188,8 +190,11 @@ class AppServices:
             raise KeyError(station_id)
 
         was_upnp_playing = False
+        should_resume_playback = False
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
+        async with self.state_lock:
+            should_resume_playback = self.state.playing_hint
         try:
             audio_state = await asyncio.to_thread(self._build_audio_state, config_copy)
             was_upnp_playing = audio_state.route_kind == "upnp" and audio_state.transport_playing
@@ -202,7 +207,7 @@ class AppServices:
 
         await self.refresh_selected_station()
 
-        if was_upnp_playing:
+        if was_upnp_playing or (config_copy.audio_output_id.startswith("upnp:") and should_resume_playback):
             try:
                 await self.set_output_playback(True)
             except Exception as exc:  # noqa: BLE001
@@ -221,6 +226,12 @@ class AppServices:
         return await self.select_station(new_id)
 
     async def set_playback(self, playing: bool) -> dict[str, Any]:
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+
+        if config_copy.audio_output_id.startswith("upnp:"):
+            await self._set_upnp_output_playback(config_copy, playing)
+
         async with self.state_lock:
             self.state.set_playing_hint(playing)
             self.repository.save(self.state)
@@ -352,25 +363,35 @@ class AppServices:
         if not config_copy.audio_output_id.startswith("upnp:"):
             return await self.get_audio_state()
 
+        await self._set_upnp_output_playback(config_copy, playing)
+        async with self.state_lock:
+            self.state.set_playing_hint(playing)
+            self.repository.save(self.state)
+        return await self.get_audio_state()
+
+    async def _set_upnp_output_playback(self, config_copy: ControllerConfig, playing: bool) -> None:
+        if not config_copy.audio_output_id.startswith("upnp:"):
+            return
+
+        if not playing:
+            await asyncio.to_thread(self.upnp_service.stop, config_copy.audio_output_id)
+            return
+
         async with self.state_lock:
             current_title = self.state.title
             current_artist = self.state.artist
             station = self.state.station
         source_stream_url = await asyncio.to_thread(self.audio_resolver.resolve, station)
         relay_stream_url = _build_upnp_stream_url(station.id)
-        if playing:
-            await asyncio.to_thread(
-                self.upnp_service.play_stream,
-                config_copy.audio_output_id,
-                relay_stream_url,
-                source_probe_url=source_stream_url,
-                title=current_title or station.name,
-                artist=current_artist or "",
-                station_name=station.name,
-            )
-        else:
-            await asyncio.to_thread(self.upnp_service.stop, config_copy.audio_output_id)
-        return await self.get_audio_state()
+        await asyncio.to_thread(
+            self.upnp_service.play_stream,
+            config_copy.audio_output_id,
+            relay_stream_url,
+            source_probe_url=source_stream_url,
+            title=current_title or station.name,
+            artist=current_artist or "",
+            station_name=station.name,
+        )
 
     async def get_config(self) -> dict[str, Any]:
         async with self.config_lock:
@@ -563,7 +584,42 @@ class AppServices:
                 await self.refresh_selected_station()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Polling refresh failed: %s", exc)
+            try:
+                await self.ensure_upnp_playback()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("UPnP playback watchdog failed: %s", exc)
             await asyncio.sleep(settings.poll_interval_seconds)
+
+    async def ensure_upnp_playback(self) -> None:
+        if not settings.upnp_playback_watchdog_enabled:
+            return
+
+        async with self.state_lock:
+            should_play = self.state.playing_hint
+            station = self.state.station
+        if not should_play:
+            return
+
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+        if not config_copy.audio_output_id.startswith("upnp:"):
+            return
+
+        now = time.monotonic()
+        cooldown = max(5, settings.upnp_playback_watchdog_cooldown_seconds)
+        if now - self.last_upnp_watchdog_attempt_at < cooldown:
+            return
+
+        audio_state = await asyncio.to_thread(self._build_audio_state, config_copy)
+        if audio_state.route_kind != "upnp" or not audio_state.supports_transport or audio_state.transport_playing:
+            return
+
+        self.last_upnp_watchdog_attempt_at = now
+        logger.warning(
+            "UPnP-Watchdog startet %s neu, weil der Transport nicht mehr spielt",
+            station.id,
+        )
+        await self._set_upnp_output_playback(config_copy, True)
 
 
 services = AppServices()
@@ -774,6 +830,27 @@ async def station_stream(station_id: str) -> RedirectResponse:
     return RedirectResponse(url=resolved_url, status_code=307)
 
 
+def _open_upnp_upstream(upstream_url: str) -> requests.Response:
+    response = requests.get(
+        upstream_url,
+        stream=True,
+        allow_redirects=True,
+        timeout=(5, settings.stream_relay_read_timeout_seconds),
+        headers={"User-Agent": settings.user_agent},
+    )
+    response.raise_for_status()
+    return response
+
+
+def _close_upnp_upstream(upstream: requests.Response | None) -> None:
+    if upstream is None:
+        return
+    try:
+        upstream.close()
+    except Exception:  # noqa: BLE001
+        logger.debug("UPnP upstream response could not be closed cleanly", exc_info=True)
+
+
 @app.api_route("/upnp-stream/{station_id}", methods=["GET", "HEAD"])
 async def upnp_station_stream(station_id: str, request: Request) -> Response:
     station = STATION_MAP.get(station_id)
@@ -782,15 +859,7 @@ async def upnp_station_stream(station_id: str, request: Request) -> Response:
 
     try:
         upstream_url = await services.resolve_station_stream(station_id)
-        upstream = await asyncio.to_thread(
-            requests.get,
-            upstream_url,
-            stream=True,
-            allow_redirects=True,
-            timeout=(5, settings.playlist_timeout_seconds),
-            headers={"User-Agent": settings.user_agent},
-        )
-        upstream.raise_for_status()
+        upstream = await asyncio.to_thread(_open_upnp_upstream, upstream_url)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"UPnP-Relay konnte den Stream nicht öffnen: {exc}") from exc
 
@@ -805,12 +874,59 @@ async def upnp_station_stream(station_id: str, request: Request) -> Response:
         return Response(status_code=200, media_type=content_type, headers=headers)
 
     def generate() -> Any:
+        current_upstream: requests.Response | None = upstream
+        reconnect_attempts = 0
         try:
-            for chunk in upstream.iter_content(chunk_size=64 * 1024):
-                if chunk:
-                    yield chunk
+            while True:
+                if current_upstream is None:
+                    reconnect_attempts += 1
+                    if reconnect_attempts > settings.stream_relay_reconnect_attempts:
+                        logger.error(
+                            "UPnP-Relay fuer %s gibt nach %s Reconnect-Versuchen auf",
+                            station.id,
+                            settings.stream_relay_reconnect_attempts,
+                        )
+                        return
+
+                    if settings.stream_relay_reconnect_delay_seconds > 0:
+                        time.sleep(settings.stream_relay_reconnect_delay_seconds)
+
+                    try:
+                        current_upstream = _open_upnp_upstream(upstream_url)
+                        logger.info(
+                            "UPnP-Relay fuer %s nach Unterbrechung neu verbunden (Versuch %s/%s)",
+                            station.id,
+                            reconnect_attempts,
+                            settings.stream_relay_reconnect_attempts,
+                        )
+                    except requests.RequestException as exc:
+                        logger.warning(
+                            "UPnP-Relay-Reconnect fuer %s fehlgeschlagen (Versuch %s/%s): %s",
+                            station.id,
+                            reconnect_attempts,
+                            settings.stream_relay_reconnect_attempts,
+                            exc,
+                        )
+                    continue
+
+                try:
+                    yielded_chunk = False
+                    for chunk in current_upstream.iter_content(chunk_size=64 * 1024):
+                        if chunk:
+                            yielded_chunk = True
+                            reconnect_attempts = 0
+                            yield chunk
+                    if yielded_chunk:
+                        logger.warning("UPnP-Relay-Stream fuer %s wurde vom Upstream beendet", station.id)
+                    else:
+                        logger.warning("UPnP-Relay-Stream fuer %s endete ohne Audiodaten", station.id)
+                except requests.RequestException as exc:
+                    logger.warning("UPnP-Relay-Stream fuer %s wurde unterbrochen: %s", station.id, exc)
+
+                _close_upnp_upstream(current_upstream)
+                current_upstream = None
         finally:
-            upstream.close()
+            _close_upnp_upstream(current_upstream)
 
     return StreamingResponse(generate(), media_type=content_type, headers=headers)
 

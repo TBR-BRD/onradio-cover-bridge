@@ -340,16 +340,34 @@ function updateLocalPlayButton() {
   localPlayButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
 
   if (localPlaybackBusy) {
-    localPlayButton.textContent = upnpRoute ? 'Sendet…' : 'Startet…';
+    localPlayButton.textContent = '...';
+    localPlayButton.title = upnpRoute ? 'WLAN-Wiedergabe wird gestartet' : 'Lokale Wiedergabe wird gestartet';
+    localPlayButton.setAttribute('aria-label', localPlayButton.title);
     return;
   }
 
   if (upnpRoute) {
-    localPlayButton.textContent = isActive ? 'WLAN aus' : 'WLAN';
+    localPlayButton.textContent = 'WLAN';
+    localPlayButton.title = isActive ? 'WLAN-Wiedergabe stoppen' : 'WLAN-Wiedergabe starten';
+    localPlayButton.setAttribute('aria-label', localPlayButton.title);
     return;
   }
 
-  localPlayButton.textContent = isActive ? 'Lokal aus' : 'Lokal';
+  localPlayButton.textContent = 'Lokal';
+  localPlayButton.title = isActive ? 'Lokale Wiedergabe stoppen' : 'Lokale Wiedergabe starten';
+  localPlayButton.setAttribute('aria-label', localPlayButton.title);
+}
+
+function compactAudioLabel(label) {
+  const normalized = String(label || 'Audio')
+    .replace(/\s+Media Renderer\b.*$/i, '')
+    .replace(/\s+-\s+RINCON[_A-Z0-9-]+$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (normalized.length <= 28) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 27).trim()}…`;
 }
 
 function updateAudioControls(audio) {
@@ -357,13 +375,17 @@ function updateAudioControls(audio) {
   const volume = Number(audio?.volume_percent ?? 0);
   const muted = Boolean(audio?.muted);
   const prefix = isUpnpRoute(audio) ? 'WLAN' : 'RPi';
+  const outputLabel = compactAudioLabel(audio?.selected_output_label);
   displayLocalVolume.textContent = available
-    ? `${prefix}: ${audio.selected_output_label || 'Audio'} · ${volume}%${muted ? ' · stumm' : ''}`
+    ? `${prefix}: ${outputLabel} · ${volume}%${muted ? ' · stumm' : ''}`
     : 'Ausgabe: nicht verfügbar';
+  displayLocalVolume.title = available ? `${audio.selected_output_label || 'Audio'} · ${volume}%${muted ? ' · stumm' : ''}` : '';
   displayMuteButton.disabled = !available;
   displayVolDownButton.disabled = !available;
   displayVolUpButton.disabled = !available;
-  displayMuteButton.textContent = muted ? 'Ton an' : 'Stumm';
+  displayMuteButton.textContent = muted ? 'Ton' : 'Stumm';
+  displayMuteButton.title = muted ? 'Ton einschalten' : 'Stummschalten';
+  displayMuteButton.setAttribute('aria-label', displayMuteButton.title);
 }
 
 function updatePlayPauseButton(nextState) {

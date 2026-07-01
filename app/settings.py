@@ -34,6 +34,11 @@ class Settings:
     app_name: str = os.getenv("APP_NAME", "onradio-cover-bridge")
     app_version: str = os.getenv("APP_VERSION", "1.0.0")
     app_contact: str = os.getenv("APP_CONTACT", "")
+    stream_relay_read_timeout_seconds: int = int(os.getenv("STREAM_RELAY_READ_TIMEOUT_SECONDS", "5"))
+    stream_relay_reconnect_attempts: int = int(os.getenv("STREAM_RELAY_RECONNECT_ATTEMPTS", "20"))
+    stream_relay_reconnect_delay_seconds: float = float(os.getenv("STREAM_RELAY_RECONNECT_DELAY_SECONDS", "0.5"))
+    upnp_playback_watchdog_enabled: bool = _env_flag("UPNP_PLAYBACK_WATCHDOG_ENABLED", True)
+    upnp_playback_watchdog_cooldown_seconds: int = int(os.getenv("UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS", "20"))
     itunes_cover_enabled: bool = _env_flag("ITUNES_COVER_ENABLED", True)
     itunes_cover_country: str = os.getenv("ITUNES_COVER_COUNTRY", "DE").strip().upper() or "DE"
     itunes_cover_timeout_seconds: int = int(os.getenv("ITUNES_COVER_TIMEOUT_SECONDS", "8"))

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Radio Display</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20260322a">
+  <link rel="stylesheet" href="/static/styles.css?v=20260701b">
 </head>
 <body class="display-body">
   <div id="backgroundLayer" class="background-layer"></div>
@@ -25,17 +25,17 @@
           <p id="displayStationName" class="station-name station-name-stage">Radio Cover Bridge</p>
           <div class="display-top-actions">
             <div class="display-button-grid display-button-grid-compact">
-              <button id="prevStationButton" class="display-mini-button" type="button">◀</button>
-              <button id="displayPlayPauseButton" class="display-mini-button" type="button">Play</button>
-              <button id="nextStationButton" class="display-mini-button" type="button">▶</button>
-              <button id="displayMuteButton" class="display-mini-button" type="button">Stumm</button>
-              <button id="displayVolDownButton" class="display-mini-button" type="button">-</button>
-              <button id="displayVolUpButton" class="display-mini-button" type="button">+</button>
+              <button id="prevStationButton" class="display-mini-button" type="button" title="Vorheriger Sender" aria-label="Vorheriger Sender">◀</button>
+              <button id="displayPlayPauseButton" class="display-mini-button" type="button" title="Wiedergabe umschalten" aria-label="Wiedergabe umschalten">Play</button>
+              <button id="nextStationButton" class="display-mini-button" type="button" title="Nächster Sender" aria-label="Nächster Sender">▶</button>
+              <button id="displayMuteButton" class="display-mini-button" type="button" title="Stummschalten" aria-label="Stummschalten">Stumm</button>
+              <button id="displayVolDownButton" class="display-mini-button" type="button" title="Leiser" aria-label="Leiser">-</button>
+              <button id="displayVolUpButton" class="display-mini-button" type="button" title="Lauter" aria-label="Lauter">+</button>
               {% if local_audio_button_enabled %}
-              <button id="localPlayButton" class="display-local-button" type="button" aria-pressed="false">Ausgabe</button>
+              <button id="localPlayButton" class="display-local-button" type="button" aria-pressed="false" title="Ausgabe starten">WLAN</button>
               {% endif %}
               {% if power_button_enabled %}
-              <button id="shutdownButton" class="display-power-button" type="button">RPi aus</button>
+              <button id="shutdownButton" class="display-power-button" type="button" title="Raspberry Pi ausschalten" aria-label="Raspberry Pi ausschalten">Aus</button>
               {% endif %}
             </div>
             <span id="backgroundIssueIndicator" class="display-issue-indicator hidden" aria-hidden="true" title="">!</span>
@@ -112,6 +112,6 @@
     window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
   </script>
-  <script src="/static/display.js?v=20260322a"></script>
+  <script src="/static/display.js?v=20260701b"></script>
 </body>
 </html>
