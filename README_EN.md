@@ -58,7 +58,7 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - FastAPI web server
 - Chromium kiosk on the Pi
 - systemd service
-- display schedule
+- display always stays active
 - shutdown button on the Pi
 - background errors handled unobtrusively
 

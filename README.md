@@ -75,7 +75,7 @@ Foto der RPi Oberfläche
 - FastAPI-Webserver
 - Chromium-Kiosk auf dem Pi
 - systemd-Service
-- Display-Zeitfenster
+- Display bleibt dauerhaft aktiv
 - Shutdown-Button auf dem Pi
 - Hintergrundfehler werden unauffällig behandelt
 

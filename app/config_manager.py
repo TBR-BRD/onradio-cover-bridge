@@ -11,7 +11,7 @@ from .settings import settings
 
 @dataclass(slots=True)
 class ControllerConfig:
-    display_schedule_enabled: bool = True
+    display_schedule_enabled: bool = False
     display_on_hour: int = 8
     display_off_hour: int = 22
     transitions_enabled: bool = True

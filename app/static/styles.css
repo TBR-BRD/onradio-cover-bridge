@@ -1395,37 +1395,6 @@ button {
   color: var(--muted);
 }
 
-.display-sleep-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  background: #000;
-}
-
-.display-sleep-copy {
-  display: grid;
-  gap: 0.35rem;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.display-sleep-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-.display-sleep-text {
-  font-size: 0.92rem;
-  color: rgba(255, 255, 255, 0.52);
-}
-
-.display-is-sleeping .display-shell {
-  opacity: 0;
-  pointer-events: none;
-}
-
 .display-side-panel {
   grid-template-rows: auto auto 1fr auto;
 }
@@ -1508,13 +1477,6 @@ button {
     font-size: 0.7rem;
   }
 
-  .display-sleep-title {
-    font-size: 1rem;
-  }
-
-  .display-sleep-text {
-    font-size: 0.82rem;
-  }
 }
 
 /* --- 800x480 Raspberry Pi display fit --- */

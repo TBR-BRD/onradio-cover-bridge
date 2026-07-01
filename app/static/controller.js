@@ -191,17 +191,20 @@ function renderAudioOutputs(outputs, selectedOutputId) {
 
 function applyConfig(config, schedule) {
   const nextConfig = config || {};
-  scheduleEnabled.checked = Boolean(nextConfig.display_schedule_enabled);
-  scheduleOnHour.value = String(nextConfig.display_on_hour ?? 8);
-  scheduleOffHour.value = String(nextConfig.display_off_hour ?? 22);
+  if (scheduleEnabled) {
+    scheduleEnabled.checked = false;
+  }
+  if (scheduleOnHour) {
+    scheduleOnHour.value = String(nextConfig.display_on_hour ?? 8);
+  }
+  if (scheduleOffHour) {
+    scheduleOffHour.value = String(nextConfig.display_off_hour ?? 22);
+  }
   transitionsEnabled.checked = Boolean(nextConfig.transitions_enabled);
   updateSourceUrl.value = nextConfig.update_source_zip_url || '';
 
-  if (schedule) {
-    const prefix = schedule.awake ? 'Gerade aktiv' : 'Gerade im Ruhemodus';
-    scheduleStatusText.textContent = `${prefix} · ${schedule.message}`;
-  } else {
-    scheduleStatusText.textContent = 'Anzeige-Konfiguration wird geladen…';
+  if (scheduleStatusText) {
+    scheduleStatusText.textContent = schedule?.message || 'Anzeige bleibt dauerhaft aktiv.';
   }
 }
 
@@ -542,14 +545,13 @@ async function refreshBackups() {
 
 async function saveDisplayConfig() {
   const payload = {
-    display_schedule_enabled: scheduleEnabled.checked,
-    display_on_hour: Number(scheduleOnHour.value),
-    display_off_hour: Number(scheduleOffHour.value),
     transitions_enabled: transitionsEnabled.checked,
   };
   const nextState = await postJson('/api/config', payload);
   applyState(nextState);
-  scheduleStatusText.textContent = 'Anzeige-Konfiguration gespeichert';
+  if (scheduleStatusText) {
+    scheduleStatusText.textContent = 'Anzeige-Konfiguration gespeichert';
+  }
 }
 
 async function saveUpdateConfig() {
@@ -683,8 +685,10 @@ backupButton.addEventListener('click', async () => {
 
 saveDisplayConfigButton.addEventListener('click', () => {
   saveDisplayConfig().catch((error) => {
-    scheduleStatusText.textContent = readableError(error);
-    scheduleStatusText.classList.add('is-error');
+    if (scheduleStatusText) {
+      scheduleStatusText.textContent = readableError(error);
+      scheduleStatusText.classList.add('is-error');
+    }
   });
 });
 

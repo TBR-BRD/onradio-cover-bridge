@@ -128,27 +128,13 @@
             <p>Nur im Controller ändern</p>
           </div>
           <label class="checkbox-row">
-            <input id="scheduleEnabled" type="checkbox">
-            <span>Anzeige nur zwischen 08:00 und 22:00 aktiv</span>
-          </label>
-          <div class="schedule-grid">
-            <label class="field compact-field">
-              <span>Ein ab</span>
-              <input id="scheduleOnHour" type="number" min="0" max="23" step="1" value="8">
-            </label>
-            <label class="field compact-field">
-              <span>Aus ab</span>
-              <input id="scheduleOffHour" type="number" min="0" max="23" step="1" value="22">
-            </label>
-          </div>
-          <label class="checkbox-row">
             <input id="transitionsEnabled" type="checkbox">
             <span>Animierte Übergänge aktiv</span>
           </label>
           <div class="button-row compact-button-row">
             <button id="saveDisplayConfigButton" class="primary-button">Anzeige speichern</button>
           </div>
-          <p id="scheduleStatusText" class="controller-inline-note">Zeitfenster wird geladen…</p>
+          <p id="scheduleStatusText" class="controller-inline-note">Anzeige bleibt dauerhaft aktiv.</p>
         </article>
 
         <article class="panel-soft-card admin-card">
@@ -200,6 +186,6 @@
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
     window.__STATIONS__ = {{ stations | tojson }};
   </script>
-  <script src="/static/controller.js?v=20260322a"></script>
+  <script src="/static/controller.js?v=20260701a"></script>
 </body>
 </html>

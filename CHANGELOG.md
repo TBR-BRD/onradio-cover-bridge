@@ -7,6 +7,7 @@ Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert
 - Apple iTunes Search API als zusätzliche Coverquelle vor MusicBrainz und Amazon ergänzt.
 - UPnP-Stream-Relay verbindet sich nach Upstream-Timeouts automatisch neu, statt den Lautsprecher-Stream zu beenden.
 - UPnP-Wiedergabe-Watchdog ergänzt, der Sonos/Renderer nach einem unerwarteten Stopp automatisch neu startet.
+- Display-Ruhemodus/Zeitfenster entfernt; die Kiosk-Anzeige bleibt dauerhaft aktiv.
 
 ## [1.0.0] - 2026-03-31
 

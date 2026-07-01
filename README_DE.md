@@ -58,7 +58,7 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - FastAPI-Webserver
 - Chromium-Kiosk auf dem Pi
 - systemd-Service
-- Display-Zeitfenster
+- Display bleibt dauerhaft aktiv
 - Shutdown-Button auf dem Pi
 - Hintergrundfehler werden unauffällig behandelt
 

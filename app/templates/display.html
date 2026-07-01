@@ -4,16 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Radio Display</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20260701b">
+  <link rel="stylesheet" href="/static/styles.css?v=20260701c">
 </head>
 <body class="display-body">
   <div id="backgroundLayer" class="background-layer"></div>
-  <div id="displaySleepOverlay" class="display-sleep-overlay hidden">
-    <div class="display-sleep-copy">
-      <p class="display-sleep-title">Anzeige ruht</p>
-      <p id="displaySleepText" class="display-sleep-text">Aktiv von 08:00 bis 22:00</p>
-    </div>
-  </div>
   <main class="display-shell display-shell-stage">
     <section class="display-stage">
       <div class="display-cover-column display-cover-column-full">
@@ -112,6 +106,6 @@
     window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
   </script>
-  <script src="/static/display.js?v=20260701b"></script>
+  <script src="/static/display.js?v=20260701c"></script>
 </body>
 </html>

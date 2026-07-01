@@ -34,8 +34,6 @@ const displayMuteButton = document.getElementById('displayMuteButton');
 const displayVolDownButton = document.getElementById('displayVolDownButton');
 const displayVolUpButton = document.getElementById('displayVolUpButton');
 const displayLocalVolume = document.getElementById('displayLocalVolume');
-const displaySleepOverlay = document.getElementById('displaySleepOverlay');
-const displaySleepText = document.getElementById('displaySleepText');
 const displayMetaBlock = document.getElementById('displayMetaBlock');
 
 let shutdownInProgress = false;
@@ -92,15 +90,7 @@ function updateClock() {
   });
 }
 
-function applySchedule(schedule) {
-  const awake = schedule?.awake !== false;
-  document.body.classList.toggle('display-is-sleeping', !awake);
-  if (awake) {
-    displaySleepOverlay.classList.add('hidden');
-  } else {
-    displaySleepText.textContent = schedule?.message || 'Aktiv von 08:00 bis 22:00';
-    displaySleepOverlay.classList.remove('hidden');
-  }
+function applySchedule() {
 }
 
 function animateSwitchIfNeeded(nextState) {
