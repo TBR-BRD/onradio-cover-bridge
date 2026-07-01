@@ -2,6 +2,10 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+- Apple iTunes Search API als zusätzliche Coverquelle vor MusicBrainz und Amazon ergänzt.
+
 ## [1.0.0] - 2026-03-31
 
 ### Erste öffentliche Version

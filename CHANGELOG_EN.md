@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Added Apple iTunes Search API as an additional cover source before MusicBrainz and Amazon.
+
 ## [1.0.0] - 2026-03-31
 
 ### First public release

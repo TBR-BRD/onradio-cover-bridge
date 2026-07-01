@@ -57,6 +57,12 @@ Foto der RPi Oberfläche
 - Ausgabeanzeige für den aktiven Lautsprecher
 - Wetteranzeige für Falkensee
 
+### Coverquellen
+- Direkte Coverdaten aus Sender- und Stream-Metadaten
+- Apple iTunes Search API als schneller Cover-Fallback
+- MusicBrainz / Cover Art Archive als offener Datenbank-Fallback
+- Amazon-Suche als letzter Fallback, wenn die offiziellen Quellen kein Cover liefern
+
 ### Wetter
 - aktueller Zustand
 - aktuelle Temperatur
@@ -203,4 +209,5 @@ sudo reboot
 - Die Audio-Ausgabe am Raspberry Pi selbst wurde entfernt.
 - Die Wiedergabe erfolgt über WLAN-/UPnP-Lautsprecher.
 - Nicht belastbar verifizierte Streams können aus der Senderliste entfernt werden.
+- Die iTunes-Coversuche kann über `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE` und `ITUNES_COVER_QUALITY` angepasst werden.
 - Siehe `INSTALLATION_DE.md` für die vollständige Installationsanleitung.

@@ -40,6 +40,12 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Active speaker output line
 - Weather panel for Falkensee
 
+### Cover Sources
+- Direct cover data from station and stream metadata
+- Apple iTunes Search API as a fast cover fallback
+- MusicBrainz / Cover Art Archive as an open database fallback
+- Amazon search as the last fallback when official sources do not provide artwork
+
 ### Weather
 - current conditions
 - current temperature
@@ -186,4 +192,5 @@ sudo reboot
 - Local Raspberry Pi audio output has been removed.
 - Playback is handled through WLAN/UPnP speakers.
 - Streams that cannot be reliably verified can be removed from the station list.
+- iTunes cover lookup can be configured with `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE`, and `ITUNES_COVER_QUALITY`.
 - For details see `INSTALLATION_EN.md`.

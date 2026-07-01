@@ -34,6 +34,11 @@ class Settings:
     app_name: str = os.getenv("APP_NAME", "onradio-cover-bridge")
     app_version: str = os.getenv("APP_VERSION", "1.0.0")
     app_contact: str = os.getenv("APP_CONTACT", "")
+    itunes_cover_enabled: bool = _env_flag("ITUNES_COVER_ENABLED", True)
+    itunes_cover_country: str = os.getenv("ITUNES_COVER_COUNTRY", "DE").strip().upper() or "DE"
+    itunes_cover_timeout_seconds: int = int(os.getenv("ITUNES_COVER_TIMEOUT_SECONDS", "8"))
+    itunes_cover_size: int = int(os.getenv("ITUNES_COVER_SIZE", "1000"))
+    itunes_cover_quality: int = int(os.getenv("ITUNES_COVER_QUALITY", "100"))
     amazon_cover_enabled: bool = _env_flag("AMAZON_COVER_ENABLED", True)
     amazon_cover_marketplace: str = os.getenv("AMAZON_COVER_MARKETPLACE", "www.amazon.de").strip() or "www.amazon.de"
     amazon_cover_timeout_seconds: int = int(os.getenv("AMAZON_COVER_TIMEOUT_SECONDS", "10"))

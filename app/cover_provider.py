@@ -68,6 +68,8 @@ AMAZON_BROWSER_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 }
 
+ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
+
 
 @dataclass(frozen=True, slots=True)
 class CoverResult:
@@ -91,6 +93,7 @@ class ImagePayload:
 
 class PreferredCoverProvider:
     def __init__(self) -> None:
+        self.itunes = ITunesSearchCoverProvider()
         self.musicbrainz = MusicBrainzCoverProvider()
         self.amazon = AmazonSearchCoverProvider()
         self.session = requests.Session()
@@ -108,13 +111,13 @@ class PreferredCoverProvider:
         if provider_result is not None:
             return provider_result
 
-        amazon_result = self.amazon.find_cover(
+        itunes_result = self.itunes.find_cover(
             now_playing.artist,
             now_playing.title,
             validate_image_url=self._probe_image_url,
         )
-        if amazon_result is not None:
-            return amazon_result
+        if itunes_result is not None:
+            return itunes_result
 
         if settings.amazon_musicbrainz_fallback_enabled:
             musicbrainz_result = self.musicbrainz.find_cover(now_playing.artist, now_playing.title)
@@ -122,6 +125,14 @@ class PreferredCoverProvider:
                 validated = self._probe_image_url(musicbrainz_result.url)
                 if validated is not None:
                     return CoverResult(url=validated, source=musicbrainz_result.source)
+
+        amazon_result = self.amazon.find_cover(
+            now_playing.artist,
+            now_playing.title,
+            validate_image_url=self._probe_image_url,
+        )
+        if amazon_result is not None:
+            return amazon_result
         return None
 
     def fetch_image_payload(self, url: str) -> ImagePayload | None:
@@ -249,6 +260,103 @@ class PreferredCoverProvider:
     def _looks_like_placeholder(url: str) -> bool:
         lowered = url.casefold()
         return any(hint in lowered for hint in GENERIC_PROVIDER_PLACEHOLDER_HINTS)
+
+
+class ITunesSearchCoverProvider:
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers.update({"User-Agent": settings.user_agent})
+        self._cache: dict[tuple[str, str, str, int, int], CoverResult | None] = {}
+        self._lock = threading.Lock()
+        self._rate_lock = threading.Lock()
+        self._last_request_ts = 0.0
+
+    def find_cover(
+        self,
+        artist: str,
+        title: str,
+        *,
+        validate_image_url: Callable[[str], str | None],
+    ) -> CoverResult | None:
+        if not settings.itunes_cover_enabled:
+            return None
+
+        clean_artist = artist.strip()
+        clean_title = title.strip()
+        if not clean_artist and not clean_title:
+            return None
+
+        country = settings.itunes_cover_country
+        size = max(60, min(settings.itunes_cover_size, 3000))
+        quality = max(1, min(settings.itunes_cover_quality, 999))
+        key = (_normalize_cache_key(clean_artist), _normalize_cache_key(clean_title), country, size, quality)
+        with self._lock:
+            if key in self._cache:
+                return self._cache[key]
+
+        result: CoverResult | None = None
+        for query in self._build_queries(clean_artist, clean_title):
+            try:
+                payload = self._search(query, country)
+            except Exception:
+                continue
+
+            results = payload.get("results")
+            if not isinstance(results, list):
+                continue
+
+            best = _pick_best_itunes_result(results, clean_artist, clean_title)
+            if best is None:
+                continue
+
+            artwork_url = _itunes_artwork_url(best, size=size, quality=quality)
+            if not artwork_url:
+                continue
+
+            validated = validate_image_url(artwork_url)
+            if validated is None:
+                continue
+
+            result = CoverResult(url=validated, source=f"Apple iTunes Search ({country})")
+            break
+
+        with self._lock:
+            self._cache[key] = result
+        return result
+
+    def _build_queries(self, artist: str, title: str) -> list[str]:
+        primary_artist = _primary_artist(artist)
+        simplified_title = _simplify_title(title)
+        return _dedupe([
+            f"{primary_artist} {simplified_title}",
+            f"{artist} {simplified_title}",
+            f"{primary_artist} {title}",
+        ])
+
+    def _search(self, query: str, country: str) -> dict[str, Any]:
+        self._respect_rate_limit()
+        response = self.session.get(
+            ITUNES_SEARCH_URL,
+            params={
+                "term": query,
+                "media": "music",
+                "entity": "song",
+                "limit": "8",
+                "country": country,
+            },
+            timeout=(5, settings.itunes_cover_timeout_seconds),
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _respect_rate_limit(self) -> None:
+        with self._rate_lock:
+            now = time.monotonic()
+            elapsed = now - self._last_request_ts
+            minimum_gap = 3.1
+            if elapsed < minimum_gap:
+                time.sleep(minimum_gap - elapsed)
+            self._last_request_ts = time.monotonic()
 
 
 class AmazonSearchCoverProvider:
@@ -456,6 +564,67 @@ class MusicBrainzCoverProvider:
         return f'recording:"{safe_title}" AND artist:"{safe_artist}"'
 
 
+def _pick_best_itunes_result(
+    results: list[Any],
+    expected_artist: str,
+    expected_title: str,
+) -> dict[str, Any] | None:
+    best_score = 0.0
+    best_result: dict[str, Any] | None = None
+
+    normalized_artist = _normalize_for_match(_primary_artist(expected_artist))
+    normalized_title = _normalize_for_match(_simplify_title(expected_title))
+    expected_has_version_hint = _contains_version_hint(expected_title)
+
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        artwork = str(item.get("artworkUrl100") or item.get("artworkUrl60") or "").strip()
+        if not artwork:
+            continue
+
+        result_artist = _normalize_for_match(_primary_artist(str(item.get("artistName") or "")))
+        result_title = _normalize_for_match(_simplify_title(str(item.get("trackName") or "")))
+        result_album = _normalize_for_match(str(item.get("collectionName") or ""))
+        combined = " ".join(value for value in (result_artist, result_title, result_album) if value)
+
+        title_score = _field_match_score(normalized_title, result_title)
+        artist_score = _field_match_score(normalized_artist, result_artist)
+        album_score = _field_match_score(normalized_title, result_album)
+
+        total_score = (title_score * 0.58) + (artist_score * 0.34) + (album_score * 0.03)
+        if item.get("wrapperType") == "track":
+            total_score += 0.025
+        if item.get("kind") == "song":
+            total_score += 0.025
+        if not expected_has_version_hint and _contains_version_hint(str(item.get("trackName") or "")):
+            total_score -= 0.08
+        if any(hint in combined for hint in AMAZON_NEGATIVE_HINTS):
+            total_score -= 0.25
+
+        if total_score > best_score:
+            best_score = total_score
+            best_result = item
+
+    if best_score < 0.66:
+        return None
+    return best_result
+
+
+def _itunes_artwork_url(result: dict[str, Any], *, size: int, quality: int) -> str:
+    url = str(result.get("artworkUrl100") or result.get("artworkUrl60") or "").strip()
+    if not url:
+        return ""
+
+    def replace_artwork_size(match: re.Match[str]) -> str:
+        filename = match.group(0)
+        ext = match.group(1)
+        suffix = "bb" if re.search(r"\d+x\d+bb\.", filename, flags=re.IGNORECASE) else f"-{quality}"
+        return f"/{size}x{size}{suffix}.{ext}"
+
+    return re.sub(r"/[^/]+\.(jpg|jpeg|png|webp)$", replace_artwork_size, url, flags=re.IGNORECASE)
+
+
 
 def _pick_best_recording(
     recordings: list[dict[str, Any]],
@@ -597,6 +766,11 @@ def _replace_if_version_hint(match: re.Match[str]) -> str:
     if any(hint in content for hint in REMIX_HINTS):
         return ""
     return match.group(0)
+
+
+def _contains_version_hint(value: str) -> bool:
+    normalized = value.casefold()
+    return any(hint in normalized for hint in REMIX_HINTS)
 
 
 
