@@ -9,6 +9,9 @@ Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert
 - UPnP-Wiedergabe-Watchdog ergänzt, der Sonos/Renderer nach einem unerwarteten Stopp automatisch neu startet.
 - Display-Ruhemodus/Zeitfenster entfernt; die Kiosk-Anzeige bleibt dauerhaft aktiv.
 - Controller-Adresse unter der WLAN-Ausgabe auf dem Kiosk-Display ergänzt und QR-Code-Caching deaktiviert.
+- Update-Seite im Controller mit Status-Kacheln, Remote-/Commit-Details und Schutz bei lokalen Änderungen verbessert.
+- Automatische Diagnose-Seite für Stream, Metadaten, Wetter, Audio, UPnP, Updates und Raspberry-Pi-Systemdaten ergänzt.
+- Kiosk-Start schließt GNOME-Keyring-Prompts, damit kein „Unlock Keyring“-Dialog über dem Display liegt.
 
 ## [1.0.0] - 2026-03-31
 

@@ -7,6 +7,9 @@
 - Added a UPnP playback watchdog that restarts Sonos/renderers after unexpected stops.
 - Removed display sleep mode/schedule; the kiosk display now stays active.
 - Added the controller address below the WLAN output line on the kiosk display and disabled QR code caching.
+- Improved the controller update page with status tiles, remote/commit details and protection when local changes exist.
+- Added an automatic diagnostics page for stream, metadata, weather, audio, UPnP, updates and Raspberry Pi system data.
+- Kiosk startup now closes GNOME keyring prompts so no "Unlock Keyring" dialog covers the display.
 
 ## [1.0.0] - 2026-03-31
 

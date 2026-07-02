@@ -5,6 +5,11 @@ sleep 8
 
 mkdir -p /home/pi/.config/chromium-kiosk
 
+# The kiosk does not need desktop keyring integration. On Raspberry Pi OS,
+# gnome-keyring can otherwise place an "Unlock Keyring" dialog over Chromium.
+pkill -x gcr-prompter >/dev/null 2>&1 || true
+pkill -f '^/usr/bin/gnome-keyring-daemon' >/dev/null 2>&1 || true
+
 # X11-Fallback
 if command -v unclutter >/dev/null 2>&1; then
   pkill -x unclutter >/dev/null 2>&1 || true

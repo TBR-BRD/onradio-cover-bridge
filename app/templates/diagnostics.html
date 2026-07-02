@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Systemdiagnose</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260702b">
+</head>
+<body class="controller-body diagnostics-body">
+  <main class="controller-shell diagnostics-shell">
+    <section class="panel controller-panel diagnostics-panel">
+      <header class="diagnostics-header">
+        <div class="diagnostics-title-block">
+          <p class="eyebrow">Automatische Diagnose</p>
+          <h1>Systemdiagnose</h1>
+          <p class="controller-subtitle">Status von Stream, Metadaten, Wetter, Audio, UPnP, Updates und Raspberry Pi.</p>
+        </div>
+        <div class="button-row compact-button-row diagnostics-actions">
+          <a class="secondary-button button-link" href="{{ controller_url }}">Controller</a>
+          <button id="runDiagnosticsButton" class="primary-button">Jetzt prüfen</button>
+        </div>
+      </header>
+
+      <section class="panel-soft-card diagnostics-summary">
+        <div class="diagnostics-summary-copy">
+          <span id="diagnosticsBadge" class="badge diagnostics-status-badge">Wird geprüft</span>
+          <h2 id="diagnosticsHeadline">Diagnose läuft…</h2>
+          <p id="diagnosticsTimestamp" class="controller-inline-note">-</p>
+        </div>
+        <div id="diagnosticsSummaryGrid" class="status-card-grid diagnostics-summary-grid"></div>
+      </section>
+
+      <section class="diagnostics-grid">
+        <article class="panel-soft-card diagnostics-card">
+          <div class="controller-subheader">
+            <h2>Raspberry Pi</h2>
+            <p>System</p>
+          </div>
+          <div id="systemFacts" class="update-details"></div>
+        </article>
+
+        <article class="panel-soft-card diagnostics-card">
+          <div class="controller-subheader">
+            <h2>Wiedergabe</h2>
+            <p>Audio und Stream</p>
+          </div>
+          <div id="playbackFacts" class="update-details"></div>
+        </article>
+
+        <article class="panel-soft-card diagnostics-card">
+          <div class="controller-subheader">
+            <h2>Updates</h2>
+            <p>Installation</p>
+          </div>
+          <div id="diagnosticsUpdateFacts" class="update-details"></div>
+        </article>
+
+        <article class="panel-soft-card diagnostics-card">
+          <div class="controller-subheader">
+            <h2>Controller</h2>
+            <p>App</p>
+          </div>
+          <div id="appFacts" class="update-details"></div>
+        </article>
+      </section>
+
+      <section class="panel-soft-card diagnostics-check-panel">
+        <div class="controller-subheader diagnostics-check-header">
+          <div>
+            <h2>Prüfliste</h2>
+            <p id="diagnosticsCheckCount">-</p>
+          </div>
+        </div>
+        <div id="diagnosticsChecks" class="diagnostics-check-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
+    window.__DIAGNOSTICS_POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
+  </script>
+  <script src="/static/diagnostics.js?v=20260702b"></script>
+</body>
+</html>

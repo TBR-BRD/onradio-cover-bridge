@@ -11,6 +11,7 @@ import requests
 import shutil
 import socket
 import subprocess
+import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -119,6 +120,7 @@ class AppServices:
         self.update_service = UpdateService(PROJECT_DIR)
         self.poll_task: asyncio.Task[None] | None = None
         self.last_upnp_watchdog_attempt_at = 0.0
+        self.started_at = time.time()
 
     async def start(self) -> None:
         await asyncio.to_thread(self._ensure_configured_output_applied)
@@ -426,6 +428,49 @@ class AppServices:
     async def apply_update(self) -> dict[str, Any]:
         return await asyncio.to_thread(self.update_service.apply_git_update)
 
+    async def get_diagnostics(self) -> dict[str, Any]:
+        async with self.state_lock:
+            station_id = self.state.selected_station_id
+            state_copy = self.state.to_public_dict()
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+            configured_update_url = config_copy.update_source_zip_url
+
+        audio_state = await asyncio.to_thread(self._build_audio_state, config_copy)
+        update_status = await asyncio.to_thread(self.update_service.status, configured_update_url)
+        selftest = await asyncio.to_thread(self.selftest_service.run, station_id, config_copy)
+        system = await asyncio.to_thread(_build_system_diagnostics, self.started_at)
+
+        checks = list(selftest.get("checks") or [])
+        checks.extend(_diagnostic_context_checks(audio_state, update_status, state_copy))
+        summary_status = _diagnostic_summary_status(checks)
+
+        return {
+            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "summary_status": summary_status,
+            "summary_label": _diagnostic_summary_label(summary_status),
+            "controller_url": _build_controller_url(),
+            "display_url": _build_display_url(),
+            "app": {
+                "version": settings.app_version,
+                "project_dir": str(PROJECT_DIR),
+                "station": state_copy.get("station"),
+                "playing_hint": state_copy.get("playing_hint"),
+                "status_text": state_copy.get("status_text"),
+                "error": state_copy.get("error"),
+                "current_track": {
+                    "artist": state_copy.get("artist"),
+                    "title": state_copy.get("title"),
+                    "played_at": state_copy.get("played_at"),
+                },
+            },
+            "system": system,
+            "audio": audio_state.to_public_dict(),
+            "update": update_status,
+            "selftest": selftest,
+            "checks": checks,
+        }
+
     async def _get_selected_station_id(self) -> str:
         async with self.state_lock:
             return self.state.selected_station_id
@@ -653,7 +698,19 @@ async def controller(request: Request) -> HTMLResponse:
         "poll_interval_ms": settings.poll_interval_seconds * 1000,
         "display_url": snapshot.get("display_url") or _build_display_url(snapshot.get("controller_url") or _build_controller_url()),
     }
-    return templates.TemplateResponse("controller.html", context)
+    return templates.TemplateResponse(request, "controller.html", context)
+
+
+@app.get("/diagnostics", response_class=HTMLResponse)
+async def diagnostics(request: Request) -> HTMLResponse:
+    snapshot = await services.snapshot()
+    context = {
+        "request": request,
+        "initial_state_json": json.dumps(snapshot, ensure_ascii=False),
+        "poll_interval_ms": max(60000, settings.poll_interval_seconds * 1000 * 4),
+        "controller_url": snapshot.get("controller_url") or _build_controller_url(),
+    }
+    return templates.TemplateResponse(request, "diagnostics.html", context)
 
 
 @app.get("/display", response_class=HTMLResponse)
@@ -671,7 +728,7 @@ async def display(request: Request) -> HTMLResponse:
         "controller_url": controller_url,
         "controller_host": _controller_host_label(controller_url),
     }
-    return templates.TemplateResponse("display.html", context)
+    return templates.TemplateResponse(request, "display.html", context)
 
 
 @app.get("/api/stations")
@@ -682,6 +739,11 @@ async def list_stations() -> dict[str, list[dict[str, str]]]:
 @app.get("/api/state")
 async def get_state() -> dict[str, Any]:
     return await services.snapshot()
+
+
+@app.get("/api/diagnostics")
+async def get_diagnostics() -> dict[str, Any]:
+    return await services.get_diagnostics()
 
 
 @app.get("/api/audio/state")
@@ -1038,6 +1100,126 @@ def _controller_host_label(url: str) -> str:
     if parsed.netloc:
         return parsed.netloc
     return url
+
+
+
+def _build_system_diagnostics(started_at: float) -> dict[str, Any]:
+    disk = shutil.disk_usage(PROJECT_DIR)
+    uptime_seconds = max(0, int(time.time() - started_at))
+    payload: dict[str, Any] = {
+        "hostname": socket.gethostname(),
+        "python": sys.version.split()[0],
+        "app_uptime_seconds": uptime_seconds,
+        "app_uptime": _format_duration(uptime_seconds),
+        "disk_total_mb": int(disk.total / 1024 / 1024),
+        "disk_free_mb": int(disk.free / 1024 / 1024),
+        "disk_free_percent": round((disk.free / disk.total) * 100, 1) if disk.total else None,
+        "load_average": None,
+        "cpu_temp_c": _read_cpu_temp(),
+    }
+    if hasattr(os, "getloadavg"):
+        try:
+            payload["load_average"] = [round(value, 2) for value in os.getloadavg()]
+        except OSError:
+            payload["load_average"] = None
+    return payload
+
+
+def _read_cpu_temp() -> float | None:
+    path = Path("/sys/class/thermal/thermal_zone0/temp")
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+        return round(int(raw) / 1000, 1)
+    except (OSError, ValueError):
+        return None
+
+
+def _diagnostic_context_checks(
+    audio_state: AudioState,
+    update_status: dict[str, Any],
+    state_payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    checks: list[dict[str, Any]] = []
+    checks.append(
+        _diagnostic_check(
+            "Controller-Adresse",
+            "ok",
+            _build_controller_url(),
+            0,
+        )
+    )
+
+    if audio_state.route_kind == "upnp" and state_payload.get("playing_hint") and not audio_state.transport_playing:
+        checks.append(
+            _diagnostic_check(
+                "UPnP-Transport",
+                "warn",
+                "Wiedergabe ist gewünscht, aber der Lautsprecher meldet aktuell keinen PLAYING-Status.",
+                0,
+            )
+        )
+    else:
+        checks.append(
+            _diagnostic_check(
+                "UPnP-Transport",
+                "ok" if audio_state.route_kind == "upnp" else "warn",
+                "Transport spielt" if audio_state.transport_playing else "Keine UPnP-Wiedergabe aktiv",
+                0,
+            )
+        )
+
+    if update_status.get("git_available"):
+        status = "warn" if update_status.get("dirty") or update_status.get("update_available") else "ok"
+    else:
+        status = "warn"
+    checks.append(
+        _diagnostic_check(
+            "Update-Installation",
+            status,
+            update_status.get("message") or "Update-Status unbekannt",
+            0,
+        )
+    )
+    return checks
+
+
+def _diagnostic_check(name: str, status: str, detail: str, duration_ms: int) -> dict[str, Any]:
+    return {
+        "name": name,
+        "status": status,
+        "detail": detail,
+        "duration_ms": duration_ms,
+    }
+
+
+def _diagnostic_summary_status(checks: list[dict[str, Any]]) -> str:
+    statuses = {str(check.get("status") or "").casefold() for check in checks}
+    if "error" in statuses:
+        return "error"
+    if "warn" in statuses:
+        return "warn"
+    return "ok"
+
+
+def _diagnostic_summary_label(status: str) -> str:
+    if status == "error":
+        return "Fehler gefunden"
+    if status == "warn":
+        return "Hinweise vorhanden"
+    return "Alles ok"
+
+
+def _format_duration(seconds: int) -> str:
+    minutes, sec = divmod(max(0, int(seconds)), 60)
+    hours, minute = divmod(minutes, 60)
+    days, hour = divmod(hours, 24)
+    if days:
+        return f"{days}d {hour}h {minute}m"
+    if hours:
+        return f"{hour}h {minute}m"
+    if minutes:
+        return f"{minute}m {sec}s"
+    return f"{sec}s"
 
 
 

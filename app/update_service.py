@@ -4,6 +4,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,7 @@ class UpdateService:
         zip_url = configured_zip_url.strip() or settings.update_source_zip_url
         git_available = self.git_path is not None and (self.project_dir / ".git").exists()
         payload: dict[str, Any] = {
+            "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "mode": "git" if git_available else ("zip" if zip_url else "none"),
             "project_dir": str(self.project_dir),
             "git_available": git_available,
@@ -30,14 +32,23 @@ class UpdateService:
         }
         if git_available:
             payload.update(self._git_status())
+            payload["can_update"] = bool(payload.get("can_update") and not payload.get("dirty"))
         else:
             payload.update(
                 {
                     "branch": None,
                     "local_commit": None,
+                    "local_commit_full": None,
                     "remote_commit": None,
+                    "remote_commit_full": None,
+                    "remote_url": None,
+                    "dirty": False,
                     "update_available": False,
-                    "message": "Update per Controller ist nur in einer Git-Installation aktiv.",
+                    "message": (
+                        "Direktupdate ist nur in einer Git-Installation aktiv."
+                        if not zip_url
+                        else "ZIP-Quelle ist gespeichert; Direktupdate benötigt eine Git-Installation."
+                    ),
                 }
             )
         return payload
@@ -47,8 +58,8 @@ class UpdateService:
 
     def apply_git_update(self) -> dict[str, Any]:
         status = self.status()
-        if not status.get("git_available"):
-            raise RuntimeError("Update per Controller ist nur in einer Git-Installation aktiv.")
+        if not status.get("can_update"):
+            raise RuntimeError(status.get("message") or "Update per Controller ist aktuell nicht möglich.")
 
         if not self.git_path:
             raise RuntimeError("git ist nicht installiert")
@@ -86,15 +97,22 @@ class UpdateService:
     def _git_status(self) -> dict[str, Any]:
         assert self.git_path is not None
         branch = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"])
-        local_commit = self._run_git(["rev-parse", "--short", "HEAD"])
+        local_commit_full = self._run_git(["rev-parse", "HEAD"])
+        local_commit = local_commit_full[:7]
+        remote_url = self._optional_git(["config", "--get", "remote.origin.url"])
+        dirty = bool(self._optional_git(["status", "--porcelain"]))
         remote_commit = None
+        remote_commit_full = None
         update_available = False
         message = None
         try:
             remote_line = self._run_git(["ls-remote", "--heads", "origin", branch])
-            remote_commit = (remote_line.split()[0][:7] if remote_line else None)
-            update_available = bool(remote_commit and remote_commit != local_commit)
-            if update_available:
+            remote_commit_full = (remote_line.split()[0] if remote_line else None)
+            remote_commit = (remote_commit_full[:7] if remote_commit_full else None)
+            update_available = bool(remote_commit_full and remote_commit_full != local_commit_full)
+            if dirty:
+                message = "Lokale Änderungen vorhanden; Direktupdate gesperrt."
+            elif update_available:
                 message = f"Update verfuegbar: {remote_commit}"
             else:
                 message = "Bereits aktuell"
@@ -103,8 +121,13 @@ class UpdateService:
         return {
             "branch": branch,
             "local_commit": local_commit,
+            "local_commit_full": local_commit_full,
             "remote_commit": remote_commit,
+            "remote_commit_full": remote_commit_full,
+            "remote_url": remote_url,
+            "dirty": dirty,
             "update_available": update_available,
+            "can_update": not dirty,
             "message": message,
         }
 
@@ -123,3 +146,10 @@ class UpdateService:
             message = completed.stderr.strip() or completed.stdout.strip() or f"git Fehler {completed.returncode}"
             raise RuntimeError(message)
         return completed.stdout.strip()
+
+    def _optional_git(self, args: list[str]) -> str | None:
+        try:
+            value = self._run_git(args)
+        except Exception:  # noqa: BLE001
+            return None
+        return value or None

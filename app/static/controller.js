@@ -45,6 +45,7 @@ const saveUpdateConfigButton = document.getElementById('saveUpdateConfigButton')
 const checkUpdateButton = document.getElementById('checkUpdateButton');
 const applyUpdateButton = document.getElementById('applyUpdateButton');
 const updateStatusText = document.getElementById('updateStatusText');
+const updateSummaryGrid = document.getElementById('updateSummaryGrid');
 const updateDetails = document.getElementById('updateDetails');
 const controllerTime = document.getElementById('controllerTime');
 const controllerDate = document.getElementById('controllerDate');
@@ -212,21 +213,33 @@ function applyUpdateStatus(updateStatus) {
   if (!updateStatus) {
     return;
   }
+  const canUpdate = Boolean(updateStatus.can_update);
+  const updateAvailable = Boolean(updateStatus.update_available);
+  const dirty = Boolean(updateStatus.dirty);
   let message = updateStatus.message || 'Update-Status unbekannt';
-  if (updateStatus.local_commit) {
-    message += ` · Lokal ${updateStatus.local_commit}`;
-  }
-  if (updateStatus.remote_commit) {
-    message += ` · Remote ${updateStatus.remote_commit}`;
+  const commitInfo = [
+    updateStatus.local_commit ? `Lokal ${updateStatus.local_commit}` : null,
+    updateStatus.remote_commit ? `Remote ${updateStatus.remote_commit}` : null,
+  ].filter(Boolean);
+  if (commitInfo.length) {
+    message += ` · ${commitInfo.join(' · ')}`;
   }
   updateStatusText.textContent = message;
-  applyUpdateButton.disabled = !updateStatus.can_update;
+  applyUpdateButton.disabled = !(canUpdate && updateAvailable);
+
+  renderUpdateSummary(updateStatus, { canUpdate, updateAvailable, dirty });
 
   updateDetails.innerHTML = '';
   const items = [
     ['Modus', updateStatus.mode || '-'],
     ['Branch', updateStatus.branch || '-'],
+    ['Remote', updateStatus.remote_url || '-'],
     ['Projekt', updateStatus.project_dir || '-'],
+    ['Lokal', updateStatus.local_commit_full || updateStatus.local_commit || '-'],
+    ['Remote-Stand', updateStatus.remote_commit_full || updateStatus.remote_commit || '-'],
+    ['Lokale Änderungen', dirty ? 'Ja' : 'Nein'],
+    ['Geprüft', formatDateTime(updateStatus.checked_at)],
+    ['ZIP-Quelle', updateStatus.zip_url_configured ? (updateStatus.zip_url || 'gespeichert') : '-'],
   ];
   for (const [label, value] of items) {
     const row = document.createElement('div');
@@ -234,6 +247,91 @@ function applyUpdateStatus(updateStatus) {
     row.innerHTML = `<span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span>`;
     updateDetails.appendChild(row);
   }
+}
+
+function renderUpdateSummary(updateStatus, flags) {
+  if (!updateSummaryGrid) {
+    return;
+  }
+  const statusCard = updateSummaryStatus(updateStatus, flags);
+  const cards = [
+    {
+      label: 'Modus',
+      value: updateStatus.git_available ? 'Git' : updateStatus.zip_url_configured ? 'ZIP' : 'Direktupdate aus',
+      detail: updateStatus.branch ? `Branch ${updateStatus.branch}` : 'Keine Git-Installation',
+      status: updateStatus.git_available ? 'ok' : 'warn',
+    },
+    {
+      label: 'Lokal',
+      value: updateStatus.local_commit || '-',
+      detail: flags.dirty ? 'Lokale Änderungen vorhanden' : 'Arbeitskopie sauber',
+      status: flags.dirty ? 'warn' : 'ok',
+    },
+    {
+      label: 'Remote',
+      value: updateStatus.remote_commit || '-',
+      detail: updateStatus.remote_url || 'Remote nicht ermittelt',
+      status: updateStatus.remote_commit ? 'ok' : 'warn',
+    },
+    statusCard,
+  ];
+  updateSummaryGrid.innerHTML = '';
+  for (const card of cards) {
+    updateSummaryGrid.appendChild(createStatusCard(card));
+  }
+}
+
+function updateSummaryStatus(updateStatus, flags) {
+  if (!updateStatus.git_available) {
+    return {
+      label: 'Status',
+      value: 'Nicht Git',
+      detail: updateStatus.message || 'Direktupdate nicht verfügbar',
+      status: 'warn',
+    };
+  }
+  if (flags.dirty) {
+    return {
+      label: 'Status',
+      value: 'Gesperrt',
+      detail: 'Lokale Änderungen zuerst sichern',
+      status: 'warn',
+    };
+  }
+  if (flags.updateAvailable) {
+    return {
+      label: 'Status',
+      value: 'Update bereit',
+      detail: updateStatus.message || 'Remote-Stand ist neuer',
+      status: 'ok',
+    };
+  }
+  return {
+    label: 'Status',
+    value: 'Aktuell',
+    detail: updateStatus.message || 'Kein Update verfügbar',
+    status: 'ok',
+  };
+}
+
+function createStatusCard(card) {
+  const article = document.createElement('article');
+  article.className = `status-card is-${card.status || 'ok'}`;
+
+  const label = document.createElement('span');
+  label.className = 'status-card-label';
+  label.textContent = card.label;
+
+  const value = document.createElement('strong');
+  value.className = 'status-card-value';
+  value.textContent = card.value || '-';
+
+  const detail = document.createElement('small');
+  detail.className = 'status-card-detail';
+  detail.textContent = card.detail || '';
+
+  article.append(label, value, detail);
+  return article;
 }
 
 function animateSwitchIfNeeded(nextState) {
@@ -380,6 +478,20 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return new Intl.DateTimeFormat('de-DE', {
+    dateStyle: 'short',
+    timeStyle: 'medium',
+  }).format(date);
 }
 
 function renderBluetoothDevices(payload) {

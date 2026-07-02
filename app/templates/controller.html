@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mobile Radio-Steuerung</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20260322a">
+  <link rel="stylesheet" href="/static/styles.css?v=20260702b">
 </head>
 <body class="controller-body">
   <main class="controller-shell controller-shell-mobile">
@@ -150,6 +150,17 @@
 
         <article class="panel-soft-card admin-card">
           <div class="controller-subheader">
+            <h2>Diagnose</h2>
+            <p>Automatische Systemprüfung</p>
+          </div>
+          <div class="button-row compact-button-row">
+            <a class="secondary-button button-link" href="/diagnostics">Diagnose öffnen</a>
+          </div>
+          <p class="controller-inline-note">Prüft Stream, Metadaten, Wetter, Audio, UPnP, Update-Installation und Raspberry-Pi-Systemdaten.</p>
+        </article>
+
+        <article class="panel-soft-card admin-card">
+          <div class="controller-subheader">
             <h2>Konfiguration</h2>
             <p>Automatische Sicherungen</p>
           </div>
@@ -169,6 +180,7 @@
             <span>Optionale ZIP-Quelle (nur gemerkt, kein Direktupdate)</span>
             <input id="updateSourceUrl" type="url" placeholder="https://github.com/.../archive/refs/heads/main.zip">
           </label>
+          <div id="updateSummaryGrid" class="status-card-grid"></div>
           <div class="button-row compact-button-row">
             <button id="saveUpdateConfigButton" class="secondary-button">Quelle merken</button>
             <button id="checkUpdateButton" class="secondary-button">Update prüfen</button>
@@ -186,6 +198,6 @@
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
     window.__STATIONS__ = {{ stations | tojson }};
   </script>
-  <script src="/static/controller.js?v=20260701a"></script>
+  <script src="/static/controller.js?v=20260702b"></script>
 </body>
 </html>
