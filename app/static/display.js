@@ -34,6 +34,7 @@ const displayMuteButton = document.getElementById('displayMuteButton');
 const displayVolDownButton = document.getElementById('displayVolDownButton');
 const displayVolUpButton = document.getElementById('displayVolUpButton');
 const displayLocalVolume = document.getElementById('displayLocalVolume');
+const displayControllerHost = document.getElementById('displayControllerHost');
 const displayMetaBlock = document.getElementById('displayMetaBlock');
 
 let shutdownInProgress = false;
@@ -41,6 +42,7 @@ let localPlaybackRequested = false;
 let localPlaybackBusy = false;
 let displayErrorTimeoutId = null;
 let lastTrackKey = null;
+let lastControllerQrUrl = null;
 
 const berlinClockFormatter = typeof Intl !== 'undefined'
   ? new Intl.DateTimeFormat('de-DE', {
@@ -378,6 +380,26 @@ function updateAudioControls(audio) {
   displayMuteButton.setAttribute('aria-label', displayMuteButton.title);
 }
 
+function updateControllerHost(nextState) {
+  const controllerHost = nextState?.controller_host || '';
+  const controllerUrl = nextState?.controller_url || '';
+
+  if (displayControllerHost) {
+    displayControllerHost.textContent = controllerHost ? `Controller: ${controllerHost}` : 'Controller: --';
+    displayControllerHost.title = controllerUrl || controllerHost;
+  }
+
+  if (controllerQrFallback && controllerHost) {
+    controllerQrFallback.textContent = controllerHost;
+  }
+
+  if (controllerQrImage && controllerUrl && controllerUrl !== lastControllerQrUrl) {
+    lastControllerQrUrl = controllerUrl;
+    const cacheKey = encodeURIComponent(controllerHost || controllerUrl);
+    controllerQrImage.src = `/controller-qr.svg?v=${cacheKey}`;
+  }
+}
+
 function updatePlayPauseButton(nextState) {
   if (!displayPlayPauseButton) {
     return;
@@ -583,6 +605,7 @@ function applyState(nextState) {
   renderWeather(nextState.display_weather);
   updateLocalPlayerSource(nextState);
   updateAudioControls(nextState.local_audio || {});
+  updateControllerHost(nextState);
   updatePlayPauseButton(nextState);
   applySchedule(nextState.display_schedule || null);
 

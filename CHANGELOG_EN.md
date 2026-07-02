@@ -6,6 +6,7 @@
 - UPnP stream relay now reconnects after upstream timeouts instead of ending the speaker stream.
 - Added a UPnP playback watchdog that restarts Sonos/renderers after unexpected stops.
 - Removed display sleep mode/schedule; the kiosk display now stays active.
+- Added the controller address below the WLAN output line on the kiosk display and disabled QR code caching.
 
 ## [1.0.0] - 2026-03-31
 

@@ -1395,6 +1395,16 @@ button {
   color: var(--muted);
 }
 
+.display-controller-host {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
+  line-height: 1.05;
+  color: rgba(179, 189, 214, 0.84);
+}
+
 .display-side-panel {
   grid-template-rows: auto auto 1fr auto;
 }
@@ -1475,6 +1485,10 @@ button {
 
   .display-local-volume {
     font-size: 0.7rem;
+  }
+
+  .display-controller-host {
+    font-size: 0.64rem;
   }
 
 }

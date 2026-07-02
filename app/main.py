@@ -805,7 +805,7 @@ async def controller_qr_svg() -> Response:
 
     svg = _build_controller_qr_svg(_build_controller_url())
     headers = {
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": "no-store",
     }
     return Response(content=svg, media_type="image/svg+xml", headers=headers)
 

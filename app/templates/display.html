@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Radio Display</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20260701c">
+  <link rel="stylesheet" href="/static/styles.css?v=20260702a">
 </head>
 <body class="display-body">
   <div id="backgroundLayer" class="background-layer"></div>
@@ -62,6 +62,7 @@
               <p id="displayClock" class="display-clock-large">--:--</p>
               <p id="displayDate" class="display-date-large">--</p>
               <p id="displayLocalVolume" class="display-local-volume">RPi: --</p>
+              <p id="displayControllerHost" class="display-controller-host">Controller: --</p>
             </div>
           </section>
         </div>
@@ -106,6 +107,6 @@
     window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
   </script>
-  <script src="/static/display.js?v=20260701c"></script>
+  <script src="/static/display.js?v=20260702a"></script>
 </body>
 </html>
