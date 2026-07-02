@@ -20,6 +20,8 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Touch controls directly on the Raspberry Pi
 - QR code for quick access to the web controller
 - Automatic kiosk start after boot
+- Automatic diagnostics page for stream, weather, audio, UPnP, updates, and Pi system data
+- Improved update status page in the controller
 - Optimized for small Raspberry Pi touch displays
 
 ## Features
@@ -37,6 +39,7 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Title and artist on the right
 - Large clock and date
 - QR code to the controller
+- Controller address shown directly on the display
 - Active speaker output line
 - Weather panel for Falkensee
 
@@ -59,7 +62,10 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Chromium kiosk on the Pi
 - systemd service
 - display always stays active
+- diagnostics page at `/diagnostics`
+- update page with Git, commit, and remote status
 - shutdown button on the Pi
+- kiosk startup suppresses GNOME keyring prompts
 - background errors handled unobtrusively
 
 ## Architecture
@@ -142,6 +148,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 
 Then test:
 - Controller: `http://<PI-IP>:8080/controller`
+- Diagnostics: `http://<PI-IP>:8080/diagnostics`
 - Display: `http://127.0.0.1:8080/display`
 
 ### 5. Set up the systemd service
@@ -185,14 +192,16 @@ sudo reboot
 ## Access
 
 - Mobile controller: `http://<PI-IP>:8080/controller`
+- Diagnostics page: `http://<PI-IP>:8080/diagnostics`
 - Raspberry Pi display: `http://127.0.0.1:8080/display`
 
 ## Notes
 
-- Local Raspberry Pi audio output has been removed.
-- Playback is handled through WLAN/UPnP speakers.
+- Audio output can be selected in the controller between local Raspberry Pi audio and WLAN/UPnP speakers.
 - Streams that cannot be reliably verified can be removed from the station list.
 - The UPnP stream relay reconnects automatically after upstream stalls; tune it with `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS`, and `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
 - The UPnP playback watchdog restarts unexpectedly stopped WLAN speakers; tune it with `UPNP_PLAYBACK_WATCHDOG_ENABLED` and `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
 - iTunes cover lookup can be configured with `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE`, and `ITUNES_COVER_QUALITY`.
+- Controller-based direct updates are only active in a Git installation; ZIP or rsync installations show update status but do not start a Git update.
+- The diagnostics page runs automatic self-tests and shows notes for stream, metadata, weather, audio, UPnP, update installation, and Raspberry Pi system data.
 - For details see `INSTALLATION_EN.md`.
