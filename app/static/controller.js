@@ -91,6 +91,18 @@ function stationProvider(station) {
   if (value.includes('sunshine-live')) {
     return { id: 'sunshine-live', name: 'Sunshine Live' };
   }
+  if (value.includes('radiobob') || value.includes('radio bob') || value.includes('streams.radiobob.de')) {
+    return { id: 'radio-bob', name: 'RADIO BOB!' };
+  }
+  if (value.includes('hit radio ffh') || value.includes('ffh.de') || value.includes('mp3.ffh.de')) {
+    return { id: 'ffh', name: 'HIT RADIO FFH' };
+  }
+  if (value.includes('absolutradio') || value.includes('absolut radio') || value.includes('absolut-')) {
+    return { id: 'absolut-radio', name: 'Absolut Radio' };
+  }
+  if (value.includes('energy.de') || value.includes('energy ') || value.includes('nrj') || value.includes('streamonkey.net/energy-')) {
+    return { id: 'energy-nrj', name: 'ENERGY/NRJ' };
+  }
   if (value.includes('antenne.de') || value.includes('antenne bayern') || value.includes('play.antenne')) {
     return { id: 'antenne-bayern', name: 'ANTENNE BAYERN' };
   }

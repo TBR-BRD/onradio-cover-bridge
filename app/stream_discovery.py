@@ -87,6 +87,22 @@ def discover_streams(page_url: str, *, limit: int = 150) -> dict[str, Any]:
         if len(candidates) >= limit:
             break
 
+    if candidates and page_host in {
+        "80s80s.de",
+        "absolutradio.de",
+        "antenne.de",
+        "energy.de",
+        "ffh.de",
+        "radiobob.de",
+        "sunshine-live.de",
+    }:
+        return {
+            "source_url": page_url,
+            "title": page_title,
+            "content_type": content_type,
+            "candidates": [candidate.to_public_dict() for candidate in candidates],
+        }
+
     for raw_url, label, source, strong_source in _extract_urls(soup, text, page_url):
         if len(candidates) >= limit:
             break
@@ -149,6 +165,42 @@ def _structured_channel_candidates(soup: BeautifulSoup, raw_html: str, page_url:
         except requests.RequestException:
             return candidates
         return _eighties_candidates(response.text[:2_500_000], "https://www.80s80s.de/streams")
+
+    if host_key == "radiobob.de":
+        candidates = _radio_bob_candidates(raw_html, page_url)
+        if len(candidates) >= 10 or urlparse(page_url).path.rstrip("/") == "/musik/streams":
+            return candidates
+        try:
+            response = requests.get(
+                "https://www.radiobob.de/musik/streams",
+                timeout=(5, settings.playlist_timeout_seconds),
+                headers={"User-Agent": settings.user_agent, "Accept": "text/html,application/xhtml+xml,*/*"},
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            return candidates
+        return _radio_bob_candidates(response.text[:2_500_000], "https://www.radiobob.de/musik/streams")
+
+    if host_key == "ffh.de":
+        candidates = _ffh_candidates(raw_html, page_url)
+        if len(candidates) >= 10 or urlparse(page_url).path.rstrip("/") == "/webradio":
+            return candidates
+        try:
+            response = requests.get(
+                "https://www.ffh.de/webradio",
+                timeout=(5, settings.playlist_timeout_seconds),
+                headers={"User-Agent": settings.user_agent, "Accept": "text/html,application/xhtml+xml,*/*"},
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            return candidates
+        return _ffh_candidates(response.text[:2_500_000], "https://www.ffh.de/webradio")
+
+    if host_key == "absolutradio.de":
+        return _absolut_candidates(raw_html, page_url)
+
+    if host_key == "energy.de":
+        return _energy_candidates(page_url)
 
     if host_key != "antenne.de":
         return []
@@ -226,6 +278,114 @@ def _eighties_candidates(raw_html: str, page_url: str) -> list[StreamCandidate]:
     return candidates
 
 
+def _radio_bob_candidates(raw_html: str, page_url: str) -> list[StreamCandidate]:
+    pattern = re.compile(r'(?:stream:"([^"]+)"(?:(?!url_high:).){0,2500}?)?url_high:"([^"]+)"', re.DOTALL)
+    candidates: list[StreamCandidate] = []
+    seen_mounts: set[str] = set()
+    for raw_name, raw_url in pattern.findall(raw_html):
+        stream_url = _normalize_radio_bob_stream_url(_decode_js_string(raw_url))
+        if not stream_url:
+            continue
+        mount_key = _stream_mount_key(stream_url)
+        if mount_key in seen_mounts:
+            continue
+        seen_mounts.add(mount_key)
+        name = _decode_js_string(raw_name) if raw_name else ""
+        if not name or re.fullmatch(r"[A-Za-z_$][\w$]{0,3}", name):
+            name = _radio_bob_name_from_url(stream_url)
+        candidates.append(
+            StreamCandidate(
+                name=f"RADIO BOB! {name}" if not name.casefold().startswith("radio bob") else name,
+                homepage_url=page_url,
+                audio_url=stream_url,
+                audio_mode="direct",
+                source="radiobob.nuxt",
+                confidence="hoch",
+            )
+        )
+    return candidates
+
+
+def _ffh_candidates(raw_html: str, page_url: str) -> list[StreamCandidate]:
+    pattern = re.compile(r"https?://mp3\.ffh\.de/(?:radioffh|ffhplus|ffhchannels)/[a-z0-9]+\.mp3", re.IGNORECASE)
+    candidates: list[StreamCandidate] = []
+    seen_urls: set[str] = set()
+    for match in pattern.finditer(raw_html):
+        stream_url = match.group(0)
+        if stream_url in seen_urls:
+            continue
+        seen_urls.add(stream_url)
+        candidates.append(
+            StreamCandidate(
+                name=_ffh_name_from_url(stream_url),
+                homepage_url=page_url,
+                audio_url=stream_url,
+                audio_mode="direct",
+                source="ffh.html",
+                confidence="hoch",
+            )
+        )
+    return candidates
+
+
+def _absolut_candidates(raw_html: str, page_url: str) -> list[StreamCandidate]:
+    pattern = re.compile(r"https?://(?:www\.)?absolutradio\.de/api/m3u/([a-z0-9-]+)\.m3u", re.IGNORECASE)
+    candidates: list[StreamCandidate] = []
+    seen_urls: set[str] = set()
+    slugs = [match.group(1).removeprefix("absolut-") for match in pattern.finditer(raw_html)]
+    slugs.extend(("clubnight", "80er", "coffeemusic", "hot", "germany", "top", "relax", "bella", "oldies", "rock", "musicxl", "lovesongs"))
+    for slug in slugs:
+        stream_url = _normalize_absolut_m3u_url(f"https://absolutradio.de/api/m3u/{slug}.m3u")
+        if not stream_url or stream_url in seen_urls:
+            continue
+        seen_urls.add(stream_url)
+        candidates.append(
+            StreamCandidate(
+                name=_absolut_name_from_slug(slug),
+                homepage_url=page_url,
+                audio_url=stream_url,
+                audio_mode="m3u",
+                source="absolut.html",
+                confidence="hoch",
+            )
+        )
+    return candidates
+
+
+def _energy_candidates(page_url: str) -> list[StreamCandidate]:
+    try:
+        response = requests.get(
+            "https://api.nrjnet.de/webradio/nrj-energy-de/config.json",
+            timeout=(5, settings.playlist_timeout_seconds),
+            headers={"User-Agent": settings.user_agent, "Accept": "application/json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError):
+        return []
+
+    candidates: list[StreamCandidate] = []
+    for channel in (payload.get("channels") or {}).values():
+        if not isinstance(channel, dict):
+            continue
+        mount = str(channel.get("streamonkeyMountName") or "").strip()
+        title = _visible_label(channel.get("title"))
+        if not mount or not title:
+            continue
+        aggregator = re.sub(r"[^a-z0-9_-]+", "", str(channel.get("aggregator") or "energyde"))
+        candidates.append(
+            StreamCandidate(
+                name=f"ENERGY {title}",
+                homepage_url=page_url,
+                audio_url=f"https://frontend.streamonkey.net/{mount}?aggregator={aggregator or 'energyde'}",
+                audio_mode="direct",
+                source="energy.config",
+                confidence="hoch",
+            )
+        )
+    return candidates
+
+
 def _decode_js_string(value: str) -> str:
     try:
         decoded = json.loads(f'"{value}"')
@@ -254,6 +414,136 @@ def _normalize_eighties_stream_url(value: str) -> str:
     if not url.startswith("https://streams.80s80s.de/"):
         return ""
     return url
+
+
+def _normalize_radio_bob_stream_url(value: str) -> str:
+    url = value.strip()
+    if url.startswith("//"):
+        url = f"https:{url}"
+    elif url.startswith("http://"):
+        url = f"https://{url[7:]}"
+    if not url.startswith("https://streams.radiobob.de/"):
+        return ""
+    return url
+
+
+def _normalize_absolut_m3u_url(value: str) -> str:
+    url = value.strip()
+    if url.startswith("http://"):
+        url = f"https://{url[7:]}"
+    if not re.fullmatch(r"https://(?:www\.)?absolutradio\.de/api/m3u/[a-z0-9-]+\.m3u", url, re.IGNORECASE):
+        return ""
+    return url.replace("https://www.absolutradio.de/", "https://absolutradio.de/")
+
+
+def _stream_mount_key(stream_url: str) -> str:
+    path = urlparse(stream_url).path.strip("/")
+    return path.split("/mp3-", 1)[0]
+
+
+def _radio_bob_name_from_url(stream_url: str) -> str:
+    mount = _stream_mount_key(stream_url)
+    names = {
+        "bob-national": "National",
+        "bob-shlive": "Schleswig-Holstein",
+        "bob-live": "Hessen",
+        "live-nrw-mitte": "NRW",
+        "bob-christmas": "Christmas Rock",
+        "bob-classicrock": "Classic Rock",
+        "bob-alternative": "Alternative Rock",
+        "bob-hartesaite": "Harte Saite",
+        "bob-acdc": "AC/DC",
+        "bob-deutsch": "Deutschrock",
+        "70errock": "70er Rock",
+        "summerrock": "Summer Rock Hits",
+        "bob-90srock": "90er Rock",
+        "2000er": "2000er Rock",
+        "rockparty": "Rockparty",
+        "bob-bestofrock": "Best of Rock",
+        "bob-wacken": "Wacken Radio",
+        "womenofrock": "Women of Rock",
+        "bob-rockhits": "Rock Hits",
+        "symphmetal": "Symphonic Metal",
+        "guitarheroes": "Guitar Heroes",
+        "bob-ironmaiden": "Iron Maiden",
+        "rockmadeingermany": "Rock made in Germany",
+        "ozzyosbourne": "Ozzy Osbourne",
+        "gamingrock": "Gaming Rock",
+        "ritter": "Der Dunkle Parabelritter",
+        "motoerhead": "Motorhead",
+        "numetal": "Nu Metal",
+        "hairmetal": "Hair Metal",
+        "bob-britpop": "Britpop",
+        "powermetal": "Power Metal",
+        "progrock": "Progressive Rock",
+        "rockoldies": "Rock Oldies",
+        "bob-metal": "Metal",
+        "bob-punk": "Punk",
+        "rollingstones": "Rolling Stones",
+        "bob-grunge": "Grunge",
+        "bob-hardrock": "Hardrock",
+        "stonerrock": "Stoner Rock",
+        "bob-festival": "Festival",
+        "folkrock": "Folk Rock",
+        "mittelalter": "Mittelalter Rock",
+        "bob-queen": "Queen",
+        "southernrock": "Southern Rock",
+        "bob-rockabilly": "Rockabilly",
+        "bob-kuschelrock": "Kuschelrock",
+        "bob-singersong": "Singer & Songwriter",
+        "bob-chillout": "Unplugged",
+    }
+    if mount in names:
+        return names[mount]
+    return mount.replace("bob-", "").replace("-", " ").title()
+
+
+def _ffh_name_from_url(stream_url: str) -> str:
+    slug = urlparse(stream_url).path.rsplit("/", 1)[-1].removesuffix(".mp3")
+    names = {
+        "hqlivestream": "Live",
+        "hqcharts": "Charts",
+        "hq80er": "80er",
+        "hq90er": "90er",
+        "hq2000er": "2000er",
+        "hq2010er": "2010er",
+        "hqtop40": "Top 40",
+        "hqvoting": "Voting",
+        "hqbestof": "Best of",
+        "hqtop1000": "Top 1000",
+        "hqjustwhite": "Just White",
+        "hqchillandgrill": "Chill & Grill",
+        "hqeurodance": "Eurodance",
+        "hqschlagerherz": "Schlagerherz",
+        "hqbrandneu": "Brandneu",
+        "hqacoustichits": "Acoustic Hits",
+        "hqsoundtrack": "Soundtrack",
+        "hqsummerfeeling": "Summer Feeling",
+        "hqfruehlingsfeeling": "Fruehlingsfeeling",
+        "hqkuschelrock": "Kuschelrock",
+        "hqkuschelpop": "Kuschelpop",
+        "hqxmas": "Xmas",
+    }
+    label = names.get(slug, slug.removeprefix("hq").replace("-", " ").title())
+    return f"HIT RADIO FFH {label}"
+
+
+def _absolut_name_from_slug(slug: str) -> str:
+    names = {
+        "clubnight": "Absolut Top Clubnight",
+        "80er": "Absolut 80er",
+        "coffeemusic": "Absolut Coffeemusic",
+        "hot": "Absolut Hot",
+        "germany": "Absolut Germany",
+        "top": "Absolut Top 2000er",
+        "relax": "Absolut Relax",
+        "bella": "Absolut Bella",
+        "oldies": "Absolut Classics",
+        "rock": "Absolut Rock",
+        "musicxl": "Absolut musicXL",
+        "lovesongs": "Absolut Lovesongs",
+    }
+    return names.get(slug, f"Absolut {slug.replace('-', ' ').title()}")
 
 
 def _extract_urls(soup: BeautifulSoup, raw_html: str, base_url: str) -> list[tuple[str, str, str, bool]]:

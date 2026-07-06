@@ -40,8 +40,8 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - Standardsender ausblenden und bei Bedarf wiederherstellen
 - Senderliste aktualisiert sich nach Änderungen automatisch im Controller
 - Webseiten nach verfügbaren Audio-Streams durchsuchen und Treffer direkt aufnehmen
-- Spezielle Erkennung für Anbieterlisten wie `https://www.antenne.de/webradio/`, `https://www.sunshine-live.de/music/channels` und `https://www.80s80s.de/streams`
-- Erweiterte Standardsenderlisten für 80s80s und Sunshine Live
+- Spezielle Erkennung für Anbieterlisten wie `https://www.antenne.de/webradio/`, `https://www.sunshine-live.de/music/channels`, `https://www.80s80s.de/streams`, `https://www.radiobob.de/musik/streams`, `https://www.ffh.de/webradio`, `https://www.absolutradio.de/` und `https://www.energy.de/streams`
+- Erweiterte Standardsenderlisten für 80s80s, Sunshine Live, RADIO BOB!, HIT RADIO FFH, Absolut Radio und ENERGY/NRJ
 
 ### Anzeige
 - Großes Cover links
@@ -57,6 +57,7 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - Apple iTunes Search API als schneller Cover-Fallback
 - MusicBrainz / Cover Art Archive als offener Datenbank-Fallback
 - Amazon-Suche als letzter Fallback, wenn die offiziellen Quellen kein Cover liefern
+- Cover werden nicht dauerhaft auf der SD-Karte gespeichert; der Cover-Proxy nutzt nur kurzlebige RAM-/Browser-Caches
 
 ### Wetter
 - aktueller Zustand
@@ -215,6 +216,7 @@ sudo reboot
 - Der UPnP-Stream-Relay verbindet sich nach Upstream-Aussetzern automatisch neu; einstellbar über `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS` und `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
 - Der UPnP-Wiedergabe-Watchdog startet unerwartet gestoppte WLAN-Lautsprecher neu; einstellbar über `UPNP_PLAYBACK_WATCHDOG_ENABLED` und `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
 - Die iTunes-Coversuche kann über `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE` und `ITUNES_COVER_QUALITY` angepasst werden.
+- Die iTunes-Covergröße ist standardmäßig auf `1000` Pixel gesetzt; geladene Cover werden nur über `/cover-proxy` ausgeliefert und nicht als Dateien in `data/` abgelegt.
 - Direktupdates im Controller sind nur in einer Git-Installation aktiv; ZIP- oder rsync-Installationen zeigen den Update-Status, starten aber kein Git-Update.
 - Die Diagnose-Seite führt automatisch Selbsttests aus und zeigt Hinweise zu Stream, Metadaten, Wetter, Audio, UPnP, Update-Installation und Raspberry-Pi-Systemdaten.
 - Für Details siehe `INSTALLATION_DE.md`.

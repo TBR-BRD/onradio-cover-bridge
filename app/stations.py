@@ -97,6 +97,233 @@ def _eighties_station(
     )
 
 
+def _radio_bob_station(*, suffix: str, name: str, mount: str) -> Station:
+    audio_url = f"https://streams.radiobob.de/{mount}/mp3-192/homepage/"
+    return Station(
+        id=f"radio-bob-{suffix}",
+        name=f"RADIO BOB! {name}",
+        homepage_url="https://www.radiobob.de/musik/streams",
+        audio_url=audio_url,
+        metadata_url=audio_url,
+        metadata_mode="icy_stream",
+    )
+
+
+def _ffh_station(*, suffix: str, name: str, path: str) -> Station:
+    audio_url = f"http://mp3.ffh.de/{path}.mp3"
+    return Station(
+        id=f"ffh-{suffix}",
+        name=f"HIT RADIO FFH {name}",
+        homepage_url="https://www.ffh.de/webradio",
+        audio_url=audio_url,
+        metadata_url=audio_url,
+        metadata_mode="icy_stream",
+    )
+
+
+def _absolut_station(*, suffix: str, name: str, slug: str) -> Station:
+    audio_url = f"https://absolutradio.de/api/m3u/{slug}.m3u"
+    return Station(
+        id=f"absolut-{suffix}",
+        name=f"Absolut {name}",
+        homepage_url="https://www.absolutradio.de/",
+        audio_url=audio_url,
+        metadata_url=audio_url,
+        audio_mode="m3u",
+        metadata_mode="icy_stream",
+    )
+
+
+def _energy_station(*, suffix: str, name: str, mount: str) -> Station:
+    audio_url = f"https://frontend.streamonkey.net/{mount}?aggregator=energyde"
+    return Station(
+        id=f"energy-{suffix}",
+        name=f"ENERGY {name}",
+        homepage_url="https://www.energy.de/streams",
+        audio_url=audio_url,
+        metadata_url=audio_url,
+        metadata_mode="icy_stream",
+    )
+
+
+RADIO_BOB_STATIONS: tuple[Station, ...] = tuple(
+    _radio_bob_station(suffix=suffix, name=name, mount=mount)
+    for suffix, name, mount in (
+        ("national", "National", "bob-national"),
+        ("schleswig-holstein", "Schleswig-Holstein", "bob-shlive"),
+        ("hessen", "Hessen", "bob-live"),
+        ("nrw", "NRW", "live-nrw-mitte"),
+        ("christmas-rock", "Christmas Rock", "bob-christmas"),
+        ("classic-rock", "Classic Rock", "bob-classicrock"),
+        ("alternative-rock", "Alternative Rock", "bob-alternative"),
+        ("harte-saite", "Harte Saite", "bob-hartesaite"),
+        ("acdc", "AC/DC", "bob-acdc"),
+        ("deutschrock", "Deutschrock", "bob-deutsch"),
+        ("70er-rock", "70er Rock", "70errock"),
+        ("summer-rock", "Summer Rock Hits", "summerrock"),
+        ("90er-rock", "90er Rock", "bob-90srock"),
+        ("2000er-rock", "2000er Rock", "2000er"),
+        ("rockparty", "Rockparty", "rockparty"),
+        ("best-of-rock", "Best of Rock", "bob-bestofrock"),
+        ("wacken-radio", "Wacken Radio", "bob-wacken"),
+        ("women-of-rock", "Women of Rock", "womenofrock"),
+        ("rock-hits", "Rock Hits", "bob-rockhits"),
+        ("metallica", "Metallica", "metallica"),
+        ("bosshoss", "The BossHoss Rockshow", "bosshoss"),
+        ("death-metal", "Death Metal", "deathmetal"),
+        ("symphonic-metal", "Symphonic Metal", "symphmetal"),
+        ("guitar-heroes", "Guitar Heroes", "guitarheroes"),
+        ("fury", "Fury in the Slaughterhouse", "fury"),
+        ("tobias-sammet", "Tobias Sammet Rockshow", "sammet"),
+        ("electro-rock", "Electro Rock", "electrorock"),
+        ("college-rock", "College Rock", "collegerock"),
+        ("rock-am-ring", "Rock am Ring Radio", "rockamring"),
+        ("iron-maiden", "Iron Maiden", "bob-ironmaiden"),
+        ("made-in-germany", "Rock made in Germany", "rockmadeingermany"),
+        ("ozzy-osbourne", "Ozzy Osbourne", "ozzyosbourne"),
+        ("gaming-rock", "Gaming Rock", "gamingrock"),
+        ("woodstock", "Woodstock", "woodstock"),
+        ("parabelritter", "Der Dunkle Parabelritter", "ritter"),
+        ("ska", "Ska", "ska"),
+        ("motorhead", "Motorhead", "motoerhead"),
+        ("nu-metal", "Nu Metal", "numetal"),
+        ("hair-metal", "Hair Metal", "hairmetal"),
+        ("britpop", "Britpop", "bob-britpop"),
+        ("power-metal", "Power Metal", "powermetal"),
+        ("blues", "Blues", "blues"),
+        ("progressive-rock", "Progressive Rock", "progrock"),
+        ("donots", "Donots Rockshow", "donots"),
+        ("emo", "Emo", "emo"),
+        ("rock-oldies", "Rock Oldies", "rockoldies"),
+        ("metal", "Metal", "bob-metal"),
+        ("kiss", "KISS", "kiss"),
+        ("country", "Country", "country"),
+        ("punk", "Punk", "bob-punk"),
+        ("rolling-stones", "Rolling Stones", "rollingstones"),
+        ("metalcore", "Metalcore", "metalcore"),
+        ("roadtrip", "Roadtrip", "roadtrip"),
+        ("grunge", "Grunge", "bob-grunge"),
+        ("hardrock", "Hardrock", "bob-hardrock"),
+        ("stoner-rock", "Stoner Rock", "stonerrock"),
+        ("festival", "Festival", "bob-festival"),
+        ("folk-rock", "Folk Rock", "folkrock"),
+        ("gothic", "Gothic", "gothic"),
+        ("mittelalter-rock", "Mittelalter Rock", "mittelalter"),
+        ("queen", "Queen", "bob-queen"),
+        ("southern-rock", "Southern Rock", "southernrock"),
+        ("rockabilly", "Rockabilly", "bob-rockabilly"),
+        ("newcomer", "Newcomer", "newcomer"),
+        ("kuschelrock", "Kuschelrock", "bob-kuschelrock"),
+        ("singer-songwriter", "Singer & Songwriter", "bob-singersong"),
+        ("unplugged", "Unplugged", "bob-chillout"),
+    )
+)
+
+
+FFH_STATIONS: tuple[Station, ...] = tuple(
+    _ffh_station(suffix=suffix, name=name, path=path)
+    for suffix, name, path in (
+        ("live", "Live", "radioffh/hqlivestream"),
+        ("charts", "Charts", "ffhplus/hqcharts"),
+        ("80er", "80er", "ffhchannels/hq80er"),
+        ("90er", "90er", "ffhchannels/hq90er"),
+        ("2000er", "2000er", "ffhchannels/hq2000er"),
+        ("2010er", "2010er", "ffhchannels/hq2010er"),
+        ("top-40", "Top 40", "ffhchannels/hqtop40"),
+        ("voting", "Voting", "ffhchannels/hqvoting"),
+        ("best-of", "Best of", "ffhchannels/hqbestof"),
+        ("rock", "Rock", "ffhchannels/hqrock"),
+        ("eurodance", "Eurodance", "ffhchannels/hqeurodance"),
+        ("oldies", "Oldies", "ffhchannels/hqoldies"),
+        ("top-1000", "Top 1000", "ffhchannels/hqtop1000"),
+        ("lounge", "Lounge", "ffhchannels/hqlounge"),
+        ("meditation", "Meditation", "ffhchannels/hqmeditation"),
+        ("country", "Country", "ffhchannels/hqcountry"),
+        ("feierbiest", "Feierbiest", "ffhchannels/hqfeierbiest"),
+        ("party", "Party", "ffhchannels/hqparty"),
+        ("happy-hits", "Happy Hits", "ffhchannels/hqhappyhits"),
+        ("just-white", "Just White", "ffhchannels/hqjustwhite"),
+        ("chill-and-grill", "Chill & Grill", "ffhchannels/hqchillandgrill"),
+        ("workout", "Workout", "ffhchannels/hqworkout"),
+        ("schlagerherz", "Schlagerherz", "ffhchannels/hqschlagerherz"),
+        ("schlager", "Schlager", "ffhchannels/hqschlager"),
+        ("deutsch", "Deutsch", "ffhchannels/hqdeutsch"),
+        ("brandneu", "Brandneu", "ffhchannels/hqbrandneu"),
+        ("acoustic-hits", "Acoustic Hits", "ffhchannels/hqacoustichits"),
+        ("soundtrack", "Soundtrack", "ffhchannels/hqsoundtrack"),
+        ("summer-feeling", "Summer Feeling", "ffhchannels/hqsummerfeeling"),
+        ("fruehlingsfeeling", "Fruehlingsfeeling", "ffhchannels/hqfruehlingsfeeling"),
+        ("kuschelrock", "Kuschelrock", "ffhchannels/hqkuschelrock"),
+        ("kuschelpop", "Kuschelpop", "ffhchannels/hqkuschelpop"),
+        ("xmas", "Xmas", "ffhchannels/hqxmas"),
+    )
+)
+
+
+ABSOLUT_STATIONS: tuple[Station, ...] = tuple(
+    _absolut_station(suffix=suffix, name=name, slug=slug)
+    for suffix, name, slug in (
+        ("clubnight", "Top Clubnight", "clubnight"),
+        ("80er", "80er", "80er"),
+        ("coffeemusic", "Coffeemusic", "coffeemusic"),
+        ("hot", "Hot", "hot"),
+        ("germany", "Germany", "germany"),
+        ("top-2000er", "Top 2000er", "top"),
+        ("relax", "Relax", "relax"),
+        ("bella", "Bella", "bella"),
+        ("classics", "Classics", "oldies"),
+        ("rock", "Rock", "rock"),
+        ("musicxl", "musicXL", "musicxl"),
+        ("lovesongs", "Lovesongs", "lovesongs"),
+    )
+)
+
+
+ENERGY_STATIONS: tuple[Station, ...] = tuple(
+    _energy_station(suffix=suffix, name=name, mount=mount)
+    for suffix, name, mount in (
+        ("national", "National", "energy-digital"),
+        ("berlin", "Berlin", "energy-berlin"),
+        ("hamburg", "Hamburg", "energy-hamburg"),
+        ("muenchen", "Muenchen", "energy-muenchen"),
+        ("nrw", "NRW", "energy-nrw"),
+        ("nuernberg", "Nuernberg", "energy-nuernberg"),
+        ("stuttgart", "Stuttgart", "energy-stuttgart"),
+        ("best-hits", "Best Hits", "energy-besthits"),
+        ("new-hits", "New Hits", "energy-newhits"),
+        ("millennial", "Millennial", "energy-millennial"),
+        ("gen-z", "Gen Z", "energy-genz"),
+        ("homeoffice", "Homeoffice", "energy-homeoffice"),
+        ("deutschrap", "Deutschrap", "energy-deutschrap"),
+        ("tiktok", "TikTok", "energy-tiktokde"),
+        ("hits", "Hits", "energy-hits"),
+        ("fitness", "Fitness", "energy-fitness"),
+        ("made-in-germany", "Made in Germany", "energy-madeingermany"),
+        ("hits-2026", "Hits 2026", "energy-hitsoftheyear"),
+        ("90er-hits", "90er Hits", "energy-90erhits"),
+        ("eurodance", "Eurodance", "energy-eurodance"),
+        ("disney-hits", "Disney Hits", "energy-disneyhits"),
+        ("afrobeats", "Afrobeats", "energy-afrobeats"),
+        ("dance", "Dance", "energy-dance"),
+        ("party-hits", "Party Hits", "energy-partyhits"),
+        ("latin", "Latin", "energy-latin"),
+        ("classic-rap", "Classic Rap", "energy-classicrap"),
+        ("summer-hits", "Summer Hits", "energy-summerhits"),
+        ("classic-rnb", "Classic RnB", "energy-classicrnb"),
+        ("germany-top-40", "Germany Top 40", "energy-top40"),
+        ("love", "Love", "energy-love"),
+        ("pop", "Pop", "energy-pop"),
+        ("2000er-hits", "2000er Hits", "energy-2000erhits"),
+        ("2010er-hits", "2010er Hits", "energy-2010erhits"),
+        ("80er-hits", "80er Hits", "energy-80erhits"),
+        ("euro-hot-30", "Euro Hot 30", "energy-eurohot30"),
+        ("k-pop", "K-Pop", "energy-kpop"),
+        ("extravadance", "Extravadance", "energy-extravadance"),
+        ("christmas-hits", "Christmas Hits", "energy-christmashits"),
+    )
+)
+
+
 STATIONS: tuple[Station, ...] = (
     _on_station(
         station_id="on-radio",
@@ -318,6 +545,10 @@ STATIONS: tuple[Station, ...] = (
     _sunshine_station(station_id="sunshine-live-nature-one", name="Sunshine Live Nature One", slug="natureone"),
     _sunshine_station(station_id="sunshine-live-mayday", name="Sunshine Live Mayday", slug="mayday"),
     _sunshine_station(station_id="sunshine-live-time-warp", name="Sunshine Live Time Warp", slug="timewarp"),
+    *RADIO_BOB_STATIONS,
+    *FFH_STATIONS,
+    *ABSOLUT_STATIONS,
+    *ENERGY_STATIONS,
     Station(
         id="radio-fritz",
         name="Radio Fritz",
@@ -358,22 +589,6 @@ STATIONS: tuple[Station, ...] = (
         homepage_url="https://www.antenne.de/webradio/workout-hits",
         audio_url="https://stream.antenne.de/workout-hits/stream/aacp?aw_0_1st.playerid=airablenow.com",
         metadata_url="https://stream.antenne.de/workout-hits/stream/aacp?aw_0_1st.playerid=airablenow.com",
-        metadata_mode="icy_stream",
-    ),
-    Station(
-        id="absolut-relax",
-        name="Absolut Relax",
-        homepage_url="https://absolutradio.de/sender/relax",
-        audio_url="https://absolut-relax.live-sm.absolutradio.de/absolut-relax/stream/aacp",
-        metadata_url="https://absolut-relax.live-sm.absolutradio.de/absolut-relax/stream/aacp",
-        metadata_mode="icy_stream",
-    ),
-    Station(
-        id="absolut-bella",
-        name="Absolut Bella",
-        homepage_url="https://absolutradio.de/sender/bella",
-        audio_url="https://absolut-bella.live-sm.absolutradio.de/absolut-bella/stream/aacp",
-        metadata_url="https://absolut-bella.live-sm.absolutradio.de/absolut-bella/stream/aacp",
         metadata_mode="icy_stream",
     ),
     Station(
