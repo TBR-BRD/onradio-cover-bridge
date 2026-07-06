@@ -1,6 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
+from typing import Any
+from urllib.parse import urlparse
+
+
+ALLOWED_AUDIO_MODES = {"direct", "pls", "m3u"}
+CUSTOM_STATION_ID_PREFIX = "custom-"
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,13 +24,18 @@ class Station:
     metadata_station_label: str | None = None
     metadata_station_aliases: tuple[str, ...] = ()
     metadata_station_id: int | None = None
+    is_custom: bool = False
 
-    def public_dict(self) -> dict[str, str]:
+    def public_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
             "stream_url": f"/stream/{self.id}",
             "homepage_url": self.homepage_url,
+            "audio_url": self.audio_url,
+            "audio_mode": self.audio_mode,
+            "custom": self.is_custom,
+            "removable": True,
         }
 
 
@@ -403,3 +415,116 @@ STATIONS: tuple[Station, ...] = (
 
 STATION_MAP: dict[str, Station] = {station.id: station for station in STATIONS}
 DEFAULT_STATION_ID = STATIONS[0].id
+
+
+def station_catalog(config: Any | None = None) -> tuple[Station, ...]:
+    hidden_station_ids = _normalized_hidden_station_ids(getattr(config, "hidden_station_ids", ()))
+    catalog = [station for station in STATIONS if station.id not in hidden_station_ids]
+    existing_ids = {station.id for station in STATIONS}
+    for payload in getattr(config, "custom_stations", ()) or ():
+        station = station_from_payload(payload, existing_ids=existing_ids)
+        if station is None:
+            continue
+        catalog.append(station)
+        existing_ids.add(station.id)
+    return tuple(catalog) or (STATIONS[0],)
+
+
+def station_map(config: Any | None = None) -> dict[str, Station]:
+    return {station.id: station for station in station_catalog(config)}
+
+
+def first_station_id(config: Any | None = None) -> str:
+    return station_catalog(config)[0].id
+
+
+def normalize_custom_station_payload(payload: dict[str, Any], existing_ids: set[str] | None = None) -> dict[str, Any]:
+    existing_ids = set(existing_ids or set())
+    name = _clean_text(payload.get("name"), max_length=80)
+    audio_url = _clean_url(payload.get("audio_url"))
+    homepage_url = _clean_url(payload.get("homepage_url"), allow_empty=True)
+    audio_mode = _clean_audio_mode(payload.get("audio_mode"))
+    if not name:
+        raise ValueError("Sendername fehlt")
+    if not audio_url:
+        raise ValueError("Stream-URL fehlt oder ist ungueltig")
+
+    station_id = _clean_station_id(payload.get("id"))
+    if not station_id or station_id in STATION_MAP or station_id in existing_ids:
+        station_id = _unique_station_id(name, existing_ids | set(STATION_MAP))
+
+    return {
+        "id": station_id,
+        "name": name,
+        "homepage_url": homepage_url,
+        "audio_url": audio_url,
+        "audio_mode": audio_mode,
+    }
+
+
+def station_from_payload(payload: Any, existing_ids: set[str] | None = None) -> Station | None:
+    if not isinstance(payload, dict):
+        return None
+    try:
+        normalized = normalize_custom_station_payload(payload, existing_ids=existing_ids)
+    except ValueError:
+        return None
+    return Station(
+        id=normalized["id"],
+        name=normalized["name"],
+        homepage_url=normalized["homepage_url"],
+        audio_url=normalized["audio_url"],
+        metadata_url=normalized["audio_url"],
+        audio_mode=normalized["audio_mode"],
+        metadata_mode="icy_stream",
+        is_custom=True,
+    )
+
+
+def _normalized_hidden_station_ids(values: Any) -> set[str]:
+    if not isinstance(values, (list, tuple, set)):
+        return set()
+    return {str(value).strip() for value in values if str(value).strip() in STATION_MAP}
+
+
+def _clean_text(value: Any, *, max_length: int) -> str:
+    return " ".join(str(value or "").split())[:max_length]
+
+
+def _clean_url(value: Any, *, allow_empty: bool = False) -> str:
+    url = str(value or "").strip()
+    if not url and allow_empty:
+        return ""
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return url
+
+
+def _clean_audio_mode(value: Any) -> str:
+    mode = str(value or "direct").strip().casefold()
+    return mode if mode in ALLOWED_AUDIO_MODES else "direct"
+
+
+def _clean_station_id(value: Any) -> str:
+    station_id = str(value or "").strip().casefold()
+    if not station_id.startswith(CUSTOM_STATION_ID_PREFIX):
+        return ""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,78}[a-z0-9]", station_id):
+        return ""
+    return station_id
+
+
+def _unique_station_id(name: str, existing_ids: set[str]) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")
+    slug = slug or "radio"
+    candidate = f"{CUSTOM_STATION_ID_PREFIX}{slug}"[:80].strip("-")
+    if candidate not in existing_ids:
+        return candidate
+    suffix = 2
+    while True:
+        trimmed = candidate[: max(1, 80 - len(str(suffix)) - 1)].strip("-")
+        next_candidate = f"{trimmed}-{suffix}"
+        if next_candidate not in existing_ids:
+            return next_candidate
+        suffix += 1

@@ -7,7 +7,7 @@
 ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD)
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
 
-Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller**, **Albumcover**, **Uhrzeit**, **Wetter**, **QR-Code** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
+Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller**, **editierbarer Senderliste**, **Webstream-Suche**, **Albumcover**, **Uhrzeit**, **Wetter**, **QR-Code** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
 
 **Short English summary:**
 
@@ -36,6 +36,8 @@ Foto der RPi Oberfläche
 - Ausgabe auf WLAN-/UPnP-Lautsprecher wie Sonos oder Denon
 - Touch-Bedienung direkt am Raspberry Pi
 - QR-Code für schnellen Zugriff auf den Webcontroller
+- Sender direkt im Controller hinzufügen, ausblenden, löschen und wiederherstellen
+- Streamsuche auf Anbieter-Webseiten mit direkter Übernahme in die persönliche Senderliste
 - Automatischer Kiosk-Start nach dem Boot
 - Automatische Diagnose-Seite für Stream, Wetter, Audio, UPnP, Updates und Pi-Systemdaten
 - Verbesserte Update-Statusseite im Controller
@@ -50,6 +52,11 @@ Foto der RPi Oberfläche
 - Senderwechsel per Mobile-Controller
 - Senderwechsel zusätzlich direkt auf dem Raspberry-Pi-Display
 - Wiedergabe über WLAN-/UPnP-Lautsprecher
+- Eigene Sender mit Name, Homepage, Stream-URL und Audio-Modus hinzufügen
+- Standardsender ausblenden und bei Bedarf wiederherstellen
+- Senderliste aktualisiert sich nach Änderungen automatisch im Controller
+- Webseiten nach verfügbaren Audio-Streams durchsuchen und Treffer direkt aufnehmen
+- Spezielle Erkennung für Anbieterlisten wie `https://www.antenne.de/webradio/`; `https://www.sunshine-live.de/` ist als Standardsender enthalten
 
 ### Anzeige
 - Großes Cover links
@@ -81,6 +88,8 @@ Foto der RPi Oberfläche
 - Display bleibt dauerhaft aktiv
 - Diagnose-Seite unter `/diagnostics`
 - Update-Seite mit Git-/Commit-/Remote-Status
+- Lokale Controller-Konfiguration in `data/config.json`
+- Automatische Konfigurations-Backups in `data/backups/`
 - Shutdown-Button auf dem Pi
 - Kiosk-Start unterdrückt GNOME-Keyring-Prompts
 - Hintergrundfehler werden unauffällig behandelt
@@ -215,7 +224,9 @@ sudo reboot
 ## Hinweise
 
 - Die Audio-Ausgabe kann im Controller zwischen lokalem Raspberry-Pi-Audio und WLAN-/UPnP-Lautsprechern gewählt werden.
-- Nicht belastbar verifizierte Streams können aus der Senderliste entfernt werden.
+- Eigene Sender werden lokal in `data/config.json` gespeichert. Diese Datei wird nicht ins GitHub-Repository übernommen.
+- Nicht belastbar verifizierte Streams können aus der Senderliste entfernt werden; Standardsender werden dabei ausgeblendet und können wiederhergestellt werden.
+- Die Streamsuche findet direkte Audio-, M3U- und PLS-Links sowie bekannte Anbieterstrukturen. Webseiten, die Streams nur nach Login oder ausschließlich per dynamischer JavaScript/API-Logik ausliefern, können weniger Treffer liefern.
 - Der UPnP-Stream-Relay verbindet sich nach Upstream-Aussetzern automatisch neu; einstellbar über `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS` und `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
 - Der UPnP-Wiedergabe-Watchdog startet unerwartet gestoppte WLAN-Lautsprecher neu; einstellbar über `UPNP_PLAYBACK_WATCHDOG_ENABLED` und `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
 - Die iTunes-Coversuche kann über `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE` und `ITUNES_COVER_QUALITY` angepasst werden.

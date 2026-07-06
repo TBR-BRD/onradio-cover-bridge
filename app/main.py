@@ -42,7 +42,16 @@ from .playlist_fetcher import PlaylistFetcher
 from .selftest_service import SelfTestService
 from .settings import settings
 from .state import SharedState, StateRepository
-from .stations import STATIONS, STATION_MAP
+from .stations import (
+    ALLOWED_AUDIO_MODES,
+    STATION_MAP,
+    Station,
+    first_station_id,
+    normalize_custom_station_payload,
+    station_catalog,
+    station_map,
+)
+from .stream_discovery import discover_streams
 from .update_service import UpdateService
 from .upnp_renderer import UpnpRendererService
 from .weather_service import WeatherService
@@ -56,6 +65,17 @@ QR_CODE_AVAILABLE = qrcode is not None and SvgPathImage is not None and settings
 
 class StationSelection(BaseModel):
     station_id: str
+
+
+class StationCreatePayload(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    homepage_url: str | None = None
+    audio_url: str = Field(..., min_length=8, max_length=500)
+    audio_mode: str = "direct"
+
+
+class StationDiscoverPayload(BaseModel):
+    url: str = Field(..., min_length=8, max_length=500)
 
 
 class PlaybackState(BaseModel):
@@ -100,6 +120,7 @@ class AppServices:
         self.config_repository = ConfigRepository()
         self.state: SharedState = self.repository.load()
         self.config: ControllerConfig = self.config_repository.load()
+        self._ensure_selected_station_available()
         self.state_lock = asyncio.Lock()
         self.config_lock = asyncio.Lock()
         self.refresh_lock = asyncio.Lock()
@@ -137,13 +158,14 @@ class AppServices:
             pass
 
     async def snapshot(self) -> dict[str, Any]:
-        async with self.state_lock:
-            payload = self.state.to_public_dict()
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
             config_public = config_copy.to_public_dict()
             display_schedule = self.display_schedule.current_state(config_copy).to_public_dict()
             configured_update_url = config_copy.update_source_zip_url
+        selected_station = await self._get_selected_station(config_copy)
+        async with self.state_lock:
+            payload = self.state.to_public_dict(selected_station)
 
         controller_url = _build_controller_url()
         payload["controller_url"] = controller_url
@@ -152,6 +174,7 @@ class AppServices:
         payload["display_host"] = _controller_host_label(payload["display_url"])
         payload["controller_qr_enabled"] = QR_CODE_AVAILABLE
         payload["config"] = config_public
+        payload["stations"] = [station.public_dict() for station in station_catalog(config_copy)]
         payload["display_schedule"] = display_schedule
         payload["app_version"] = settings.app_version
 
@@ -188,13 +211,13 @@ class AppServices:
         return payload
 
     async def select_station(self, station_id: str) -> dict[str, Any]:
-        if station_id not in STATION_MAP:
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+        if station_id not in station_map(config_copy):
             raise KeyError(station_id)
 
         was_upnp_playing = False
         should_resume_playback = False
-        async with self.config_lock:
-            config_copy = ControllerConfig(**self.config.to_public_dict())
         async with self.state_lock:
             should_resume_playback = self.state.playing_hint
         try:
@@ -219,7 +242,9 @@ class AppServices:
     async def select_relative_station(self, step: int) -> dict[str, Any]:
         async with self.state_lock:
             current_id = self.state.selected_station_id
-        ids = [station.id for station in STATIONS]
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+        ids = [station.id for station in station_catalog(config_copy)]
         try:
             index = ids.index(current_id)
         except ValueError:
@@ -241,7 +266,9 @@ class AppServices:
 
     async def refresh_selected_station(self) -> dict[str, Any]:
         async with self.refresh_lock:
-            station = STATION_MAP[(await self._get_selected_station_id())]
+            async with self.config_lock:
+                config_copy = ControllerConfig(**self.config.to_public_dict())
+            station = await self._get_selected_station(config_copy)
             try:
                 now_playing = await asyncio.to_thread(self.playlist_fetcher.fetch, station)
             except Exception as exc:  # noqa: BLE001
@@ -276,10 +303,85 @@ class AppServices:
         return await self.snapshot()
 
     async def resolve_station_stream(self, station_id: str) -> str:
-        if station_id not in STATION_MAP:
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+        stations_by_id = station_map(config_copy)
+        if station_id not in stations_by_id:
             raise KeyError(station_id)
-        station = STATION_MAP[station_id]
+        station = stations_by_id[station_id]
         return await asyncio.to_thread(self.audio_resolver.resolve, station)
+
+    async def get_station(self, station_id: str) -> Station:
+        async with self.config_lock:
+            stations_by_id = station_map(self.config)
+        if station_id not in stations_by_id:
+            raise KeyError(station_id)
+        return stations_by_id[station_id]
+
+    async def list_stations(self) -> dict[str, Any]:
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+        return {
+            "stations": [station.public_dict() for station in station_catalog(config_copy)],
+            "hidden_station_ids": list(config_copy.hidden_station_ids),
+        }
+
+    async def add_custom_station(self, payload: dict[str, Any]) -> dict[str, Any]:
+        audio_mode = str(payload.get("audio_mode") or "direct").strip().casefold()
+        if audio_mode not in ALLOWED_AUDIO_MODES:
+            raise ValueError("Unbekannter Stream-Typ")
+        payload["audio_mode"] = audio_mode
+        async with self.config_lock:
+            existing_ids = set(station_map(self.config))
+            normalized = normalize_custom_station_payload(payload, existing_ids=existing_ids)
+            self.config.custom_stations.append(normalized)
+            self.config.normalize()
+            self.config_repository.save(self.config)
+        return await self.snapshot()
+
+    async def discover_station_streams(self, url: str) -> dict[str, Any]:
+        return await asyncio.to_thread(discover_streams, url)
+
+    async def remove_station(self, station_id: str) -> dict[str, Any]:
+        station_id = str(station_id or "").strip()
+        changed = False
+        selected_changed = False
+
+        async with self.config_lock:
+            config_map = station_map(self.config)
+            if station_id not in config_map:
+                raise KeyError(station_id)
+
+            if config_map[station_id].is_custom:
+                before_count = len(self.config.custom_stations)
+                self.config.custom_stations = [station for station in self.config.custom_stations if station.get("id") != station_id]
+                changed = len(self.config.custom_stations) != before_count
+            elif station_id in STATION_MAP and station_id not in self.config.hidden_station_ids:
+                self.config.hidden_station_ids.append(station_id)
+                changed = True
+
+            self.config.normalize()
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+            if changed:
+                self.config_repository.save(self.config)
+
+        if changed:
+            async with self.state_lock:
+                if self.state.selected_station_id not in station_map(config_copy):
+                    self.state.set_selected_station(first_station_id(config_copy))
+                    self.repository.save(self.state)
+                    selected_changed = True
+
+        if selected_changed:
+            return await self.refresh_selected_station()
+        return await self.snapshot()
+
+    async def restore_builtin_stations(self) -> dict[str, Any]:
+        async with self.config_lock:
+            self.config.hidden_station_ids = []
+            self.config.normalize()
+            self.config_repository.save(self.config)
+        return await self.snapshot()
 
     async def get_cover_payload(self, url: str):
         return await asyncio.to_thread(self.cover_provider.fetch_image_payload, url)
@@ -382,7 +484,8 @@ class AppServices:
         async with self.state_lock:
             current_title = self.state.title
             current_artist = self.state.artist
-            station = self.state.station
+            station_id = self.state.selected_station_id
+        station = station_map(config_copy).get(station_id) or station_catalog(config_copy)[0]
         source_stream_url = await asyncio.to_thread(self.audio_resolver.resolve, station)
         relay_stream_url = _build_upnp_stream_url(station.id)
         await asyncio.to_thread(
@@ -414,11 +517,10 @@ class AppServices:
         return {"ok": True, "backup": path.name}
 
     async def run_selftest(self) -> dict[str, Any]:
-        async with self.state_lock:
-            station_id = self.state.selected_station_id
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        return await asyncio.to_thread(self.selftest_service.run, station_id, config_copy)
+        station = await self._get_selected_station(config_copy)
+        return await asyncio.to_thread(self.selftest_service.run, station, config_copy)
 
     async def get_update_status(self) -> dict[str, Any]:
         async with self.config_lock:
@@ -429,16 +531,16 @@ class AppServices:
         return await asyncio.to_thread(self.update_service.apply_git_update)
 
     async def get_diagnostics(self) -> dict[str, Any]:
-        async with self.state_lock:
-            station_id = self.state.selected_station_id
-            state_copy = self.state.to_public_dict()
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
             configured_update_url = config_copy.update_source_zip_url
+        station = await self._get_selected_station(config_copy)
+        async with self.state_lock:
+            state_copy = self.state.to_public_dict(station)
 
         audio_state = await asyncio.to_thread(self._build_audio_state, config_copy)
         update_status = await asyncio.to_thread(self.update_service.status, configured_update_url)
-        selftest = await asyncio.to_thread(self.selftest_service.run, station_id, config_copy)
+        selftest = await asyncio.to_thread(self.selftest_service.run, station, config_copy)
         system = await asyncio.to_thread(_build_system_diagnostics, self.started_at)
 
         checks = list(selftest.get("checks") or [])
@@ -474,6 +576,23 @@ class AppServices:
     async def _get_selected_station_id(self) -> str:
         async with self.state_lock:
             return self.state.selected_station_id
+
+    async def _get_selected_station(self, config: ControllerConfig) -> Station:
+        stations_by_id = station_map(config)
+        async with self.state_lock:
+            station = stations_by_id.get(self.state.selected_station_id)
+            if station is not None:
+                return station
+            fallback = station_catalog(config)[0]
+            self.state.set_selected_station(fallback.id)
+            self.repository.save(self.state)
+            return fallback
+
+    def _ensure_selected_station_available(self) -> None:
+        if self.state.selected_station_id in station_map(self.config):
+            return
+        self.state.set_selected_station(first_station_id(self.config))
+        self.repository.save(self.state)
 
     @staticmethod
     def _to_local_cover_url(url: str) -> str:
@@ -641,12 +760,12 @@ class AppServices:
 
         async with self.state_lock:
             should_play = self.state.playing_hint
-            station = self.state.station
         if not should_play:
             return
 
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
+        station = await self._get_selected_station(config_copy)
         if not config_copy.audio_output_id.startswith("upnp:"):
             return
 
@@ -693,7 +812,7 @@ async def controller(request: Request) -> HTMLResponse:
     snapshot = await services.snapshot()
     context = {
         "request": request,
-        "stations": [station.public_dict() for station in STATIONS],
+        "stations": snapshot.get("stations") or [],
         "initial_state_json": json.dumps(snapshot, ensure_ascii=False),
         "poll_interval_ms": settings.poll_interval_seconds * 1000,
         "display_url": snapshot.get("display_url") or _build_display_url(snapshot.get("controller_url") or _build_controller_url()),
@@ -732,8 +851,31 @@ async def display(request: Request) -> HTMLResponse:
 
 
 @app.get("/api/stations")
-async def list_stations() -> dict[str, list[dict[str, str]]]:
-    return {"stations": [station.public_dict() for station in STATIONS]}
+async def list_stations() -> dict[str, Any]:
+    return await services.list_stations()
+
+
+@app.post("/api/stations")
+async def create_station(payload: StationCreatePayload) -> dict[str, Any]:
+    try:
+        return await services.add_custom_station(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/stations/discover")
+async def discover_station_streams(payload: StationDiscoverPayload) -> dict[str, Any]:
+    try:
+        return await services.discover_station_streams(payload.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=400, detail=f"Webseite konnte nicht geladen werden: {exc}") from exc
+
+
+@app.post("/api/stations/restore")
+async def restore_stations() -> dict[str, Any]:
+    return await services.restore_builtin_stations()
 
 
 @app.get("/api/state")
@@ -915,8 +1057,9 @@ def _close_upnp_upstream(upstream: requests.Response | None) -> None:
 
 @app.api_route("/upnp-stream/{station_id}", methods=["GET", "HEAD"])
 async def upnp_station_stream(station_id: str, request: Request) -> Response:
-    station = STATION_MAP.get(station_id)
-    if station is None:
+    try:
+        station = await services.get_station(station_id)
+    except KeyError as exc:
         raise HTTPException(status_code=404, detail="Unbekannter Sender")
 
     try:
@@ -1009,6 +1152,14 @@ async def select_next_station() -> dict[str, Any]:
 @app.post("/api/stations/prev")
 async def select_prev_station() -> dict[str, Any]:
     return await services.select_relative_station(-1)
+
+
+@app.delete("/api/stations/{station_id}")
+async def delete_station(station_id: str) -> dict[str, Any]:
+    try:
+        return await services.remove_station(station_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Unbekannter Sender") from exc
 
 
 @app.post("/api/playback")

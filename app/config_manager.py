@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .settings import settings
+from .stations import normalize_custom_station_payload
 
 
 @dataclass(slots=True)
@@ -17,6 +18,8 @@ class ControllerConfig:
     transitions_enabled: bool = True
     update_source_zip_url: str = ""
     audio_output_id: str = "jack"
+    custom_stations: list[dict[str, Any]] = field(default_factory=list)
+    hidden_station_ids: list[str] = field(default_factory=list)
 
     def normalize(self) -> None:
         self.display_on_hour = max(0, min(23, int(self.display_on_hour)))
@@ -25,6 +28,19 @@ class ControllerConfig:
         self.transitions_enabled = bool(self.transitions_enabled)
         self.update_source_zip_url = str(self.update_source_zip_url or "").strip()
         self.audio_output_id = str(self.audio_output_id or "jack").strip() or "jack"
+        self.hidden_station_ids = sorted({str(value).strip() for value in self.hidden_station_ids if str(value).strip()})
+        normalized_stations: list[dict[str, Any]] = []
+        existing_ids: set[str] = set()
+        for station_payload in self.custom_stations:
+            if not isinstance(station_payload, dict):
+                continue
+            try:
+                normalized = normalize_custom_station_payload(station_payload, existing_ids)
+            except ValueError:
+                continue
+            normalized_stations.append(normalized)
+            existing_ids.add(normalized["id"])
+        self.custom_stations = normalized_stations
 
     def update_from_payload(self, payload: dict[str, Any]) -> None:
         if "display_schedule_enabled" in payload:
@@ -39,6 +55,10 @@ class ControllerConfig:
             self.update_source_zip_url = str(payload["update_source_zip_url"] or "").strip()
         if "audio_output_id" in payload:
             self.audio_output_id = str(payload["audio_output_id"] or "jack").strip() or "jack"
+        if "custom_stations" in payload:
+            self.custom_stations = list(payload["custom_stations"] or [])
+        if "hidden_station_ids" in payload:
+            self.hidden_station_ids = list(payload["hidden_station_ids"] or [])
         self.normalize()
 
     def to_public_dict(self) -> dict[str, Any]:

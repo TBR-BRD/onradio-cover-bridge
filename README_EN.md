@@ -7,7 +7,7 @@
 ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD)
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
 
-A Raspberry Pi based **radio and information display** with a **mobile web controller**, **album artwork**, **clock**, **weather**, **QR code**, and **audio output to WLAN/UPnP speakers**.
+A Raspberry Pi based **radio and information display** with a **mobile web controller**, **editable station list**, **web stream discovery**, **album artwork**, **clock**, **weather**, **QR code**, and **audio output to WLAN/UPnP speakers**.
 
 The system is designed for a Raspberry Pi 3 with the official 7-inch display as a permanent kiosk display on a local home network.  
 Control is handled comfortably from an iPhone or any other smartphone on the same Wi-Fi network.
@@ -19,6 +19,8 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Audio output to WLAN/UPnP speakers such as Sonos or Denon
 - Touch controls directly on the Raspberry Pi
 - QR code for quick access to the web controller
+- Add, hide, remove, and restore stations directly in the controller
+- Discover streams on provider websites and add them to the personal station list
 - Automatic kiosk start after boot
 - Automatic diagnostics page for stream, weather, audio, UPnP, updates, and Pi system data
 - Improved update status page in the controller
@@ -33,6 +35,11 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Station switching from the controller
 - Station switching directly on the Raspberry Pi display
 - Playback through WLAN/UPnP speakers
+- Add custom stations with name, homepage, stream URL, and audio mode
+- Hide built-in stations and restore them when needed
+- Station list updates automatically after changes in the controller
+- Search websites for available audio streams and add discovered entries directly
+- Special detection for provider lists such as `https://www.antenne.de/webradio/`; `https://www.sunshine-live.de/` is included as a built-in station
 
 ### Display
 - Large cover artwork on the left
@@ -64,6 +71,8 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - display always stays active
 - diagnostics page at `/diagnostics`
 - update page with Git, commit, and remote status
+- local controller configuration in `data/config.json`
+- automatic configuration backups in `data/backups/`
 - shutdown button on the Pi
 - kiosk startup suppresses GNOME keyring prompts
 - background errors handled unobtrusively
@@ -198,7 +207,9 @@ sudo reboot
 ## Notes
 
 - Audio output can be selected in the controller between local Raspberry Pi audio and WLAN/UPnP speakers.
-- Streams that cannot be reliably verified can be removed from the station list.
+- Custom stations are stored locally in `data/config.json`. This file is not committed to the GitHub repository.
+- Streams that cannot be reliably verified can be removed from the station list; built-in stations are hidden and can be restored.
+- Stream discovery finds direct audio, M3U, and PLS links as well as known provider structures. Websites that expose streams only after login or exclusively through dynamic JavaScript/API logic may return fewer results.
 - The UPnP stream relay reconnects automatically after upstream stalls; tune it with `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS`, and `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
 - The UPnP playback watchdog restarts unexpectedly stopped WLAN speakers; tune it with `UPNP_PLAYBACK_WATCHDOG_ENABLED` and `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
 - iTunes cover lookup can be configured with `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE`, and `ITUNES_COVER_QUALITY`.

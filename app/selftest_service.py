@@ -10,7 +10,7 @@ from .audio_resolver import AudioStreamResolver
 from .audio_system import AudioSystemService
 from .config_manager import ControllerConfig
 from .playlist_fetcher import PlaylistFetcher
-from .stations import STATION_MAP
+from .stations import Station
 from .upnp_renderer import UpnpRendererService
 from .weather_service import WeatherService
 
@@ -47,8 +47,7 @@ class SelfTestService:
         self.audio_service = audio_service
         self.upnp_service = upnp_service
 
-    def run(self, selected_station_id: str, config: ControllerConfig | None = None) -> dict[str, Any]:
-        station = STATION_MAP[selected_station_id]
+    def run(self, station: Station, config: ControllerConfig | None = None) -> dict[str, Any]:
         config = config or ControllerConfig()
         checks = [
             self._run_check("DNS / Internet", self._check_dns),

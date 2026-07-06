@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .settings import settings
-from .stations import DEFAULT_STATION_ID, STATION_MAP, Station
+from .stations import DEFAULT_STATION_ID, Station
 
 
 UTC = timezone.utc
@@ -26,24 +26,17 @@ class SharedState:
     error: str | None = None
     updated_at: str = field(default_factory=lambda: _now_iso())
 
-    def to_public_dict(self) -> dict[str, Any]:
-        station = self.station
+    def to_public_dict(self, station: Station) -> dict[str, Any]:
         return {
             **asdict(self),
             "station": station.public_dict(),
         }
 
     @property
-    def station(self) -> Station:
-        return STATION_MAP[self.selected_station_id]
-
-    @property
     def track_key(self) -> tuple[str | None, str | None, str]:
         return self.artist, self.title, self.selected_station_id
 
     def set_selected_station(self, station_id: str) -> None:
-        if station_id not in STATION_MAP:
-            raise KeyError(station_id)
         self.selected_station_id = station_id
         self.status_text = "Sender gewechselt"
         self.error = None
@@ -94,8 +87,6 @@ class StateRepository:
 
         state = SharedState()
         state.selected_station_id = payload.get("selected_station_id", DEFAULT_STATION_ID)
-        if state.selected_station_id not in STATION_MAP:
-            state.selected_station_id = DEFAULT_STATION_ID
         state.playing_hint = bool(payload.get("playing_hint", False))
         state.played_at = payload.get("played_at")
         state.artist = payload.get("artist")

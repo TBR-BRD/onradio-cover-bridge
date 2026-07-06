@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mobile Radio-Steuerung</title>
-  <link rel="stylesheet" href="/static/styles.css?v=20260702b">
+  <link rel="stylesheet" href="/static/styles.css?v=20260706b">
 </head>
 <body class="controller-body">
   <main class="controller-shell controller-shell-mobile">
@@ -44,9 +44,47 @@
         <section class="controller-station-panel">
           <div class="controller-subheader">
             <h2>Sender</h2>
-            <p>Direkt antippen</p>
+            <p>Direkt antippen oder bearbeiten</p>
           </div>
           <div id="stationList" class="station-list" role="listbox" aria-label="Senderliste"></div>
+          <form id="stationDiscoveryForm" class="station-discovery-form">
+            <label class="field compact-field">
+              <span>Streams auf Webseite suchen</span>
+              <input id="stationDiscoveryUrl" type="url" placeholder="https://www.sunshine-live.de/">
+            </label>
+            <div class="button-row compact-button-row">
+              <button id="stationDiscoveryButton" class="secondary-button" type="submit">Streams suchen</button>
+            </div>
+            <p id="stationDiscoveryStatus" class="controller-inline-note">Webseite einfügen, Treffer prüfen und übernehmen.</p>
+            <div id="stationDiscoveryResults" class="stream-discovery-results"></div>
+          </form>
+          <form id="stationForm" class="station-form">
+            <label class="field compact-field">
+              <span>Name</span>
+              <input id="stationNameInput" type="text" maxlength="80" placeholder="Sunshine Live">
+            </label>
+            <label class="field compact-field">
+              <span>Homepage</span>
+              <input id="stationHomepageInput" type="url" placeholder="https://www.sunshine-live.de/">
+            </label>
+            <label class="field compact-field">
+              <span>Stream-URL</span>
+              <input id="stationStreamInput" type="url" placeholder="https://stream.example.org/live.mp3">
+            </label>
+            <label class="field compact-field">
+              <span>Stream-Typ</span>
+              <select id="stationAudioMode">
+                <option value="direct">Direkter Stream</option>
+                <option value="pls">PLS-Playlist</option>
+                <option value="m3u">M3U-Playlist</option>
+              </select>
+            </label>
+            <div class="button-row compact-button-row">
+              <button id="stationAddButton" class="primary-button" type="submit">Sender hinzufügen</button>
+              <button id="stationRestoreButton" class="secondary-button hidden" type="button">Standards wiederherstellen</button>
+            </div>
+            <p id="stationManagerStatus" class="controller-inline-note">Sunshine Live ist bereits in der Standardliste enthalten.</p>
+          </form>
         </section>
 
         <section class="controller-content-panel">
@@ -198,6 +236,6 @@
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
     window.__STATIONS__ = {{ stations | tojson }};
   </script>
-  <script src="/static/controller.js?v=20260702b"></script>
+  <script src="/static/controller.js?v=20260706b"></script>
 </body>
 </html>
