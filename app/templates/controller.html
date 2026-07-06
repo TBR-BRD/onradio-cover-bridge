@@ -44,9 +44,19 @@
         <section class="controller-station-panel">
           <div class="controller-subheader">
             <h2>Sender</h2>
-            <p>Direkt antippen oder bearbeiten</p>
+            <p>Anbieter und Stream auswählen</p>
           </div>
-          <div id="stationList" class="station-list" role="listbox" aria-label="Senderliste"></div>
+          <div id="stationList" class="station-list" aria-label="Senderauswahl">
+            <label class="field compact-field station-provider-field">
+              <span>Anbieter</span>
+              <select id="providerSelect"></select>
+            </label>
+            <label class="field compact-field station-stream-field">
+              <span>Stream</span>
+              <select id="stationSelect"></select>
+            </label>
+            <button id="stationRemoveButton" class="station-remove-button" type="button" aria-label="Ausgewählten Stream entfernen" title="Ausgewählten Stream entfernen">×</button>
+          </div>
           <form id="stationDiscoveryForm" class="station-discovery-form">
             <label class="field compact-field">
               <span>Streams auf Webseite suchen</span>

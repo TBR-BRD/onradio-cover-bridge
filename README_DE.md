@@ -19,6 +19,7 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - Ausgabe auf WLAN-/UPnP-Lautsprecher wie Sonos oder Denon
 - Touch-Bedienung direkt am Raspberry Pi
 - QR-Code für schnellen Zugriff auf den Webcontroller
+- Übersichtliche Anbieter- und Stream-Auswahl per zwei Drop-downs
 - Sender direkt im Controller hinzufügen, ausblenden, löschen und wiederherstellen
 - Streamsuche auf Anbieter-Webseiten mit direkter Übernahme in die persönliche Senderliste
 - Automatischer Kiosk-Start nach dem Boot
@@ -30,7 +31,7 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 
 ### Radio / Sender
 - Auswahl vieler Internetradio-Sender über den Mobile-Webcontroller
-- Senderliste als direkt anklickbare Liste, kein Drop-down
+- Senderauswahl nach Anbieter und Stream getrennt, z. B. ON Radio, 80s80s und Sunshine Live
 - Start / Stop der Wiedergabe
 - Senderwechsel per Mobile-Controller
 - Senderwechsel zusätzlich direkt auf dem Raspberry-Pi-Display
@@ -39,7 +40,8 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - Standardsender ausblenden und bei Bedarf wiederherstellen
 - Senderliste aktualisiert sich nach Änderungen automatisch im Controller
 - Webseiten nach verfügbaren Audio-Streams durchsuchen und Treffer direkt aufnehmen
-- Spezielle Erkennung für Anbieterlisten wie `https://www.antenne.de/webradio/`; `https://www.sunshine-live.de/` ist als Standardsender enthalten
+- Spezielle Erkennung für Anbieterlisten wie `https://www.antenne.de/webradio/`, `https://www.sunshine-live.de/music/channels` und `https://www.80s80s.de/streams`
+- Erweiterte Standardsenderlisten für 80s80s und Sunshine Live
 
 ### Anzeige
 - Großes Cover links

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -78,7 +79,7 @@ def discover_streams(page_url: str, *, limit: int = 150) -> dict[str, Any]:
 
     seen: set[str] = set()
     candidates: list[StreamCandidate] = []
-    for candidate in _structured_channel_candidates(soup, page_url, page_title):
+    for candidate in _structured_channel_candidates(soup, text, page_url, page_title):
         if candidate.audio_url in seen:
             continue
         seen.add(candidate.audio_url)
@@ -117,8 +118,39 @@ def discover_streams(page_url: str, *, limit: int = 150) -> dict[str, Any]:
     }
 
 
-def _structured_channel_candidates(soup: BeautifulSoup, page_url: str, page_title: str) -> list[StreamCandidate]:
-    if _host_key(page_url) != "antenne.de":
+def _structured_channel_candidates(soup: BeautifulSoup, raw_html: str, page_url: str, page_title: str) -> list[StreamCandidate]:
+    host_key = _host_key(page_url)
+    if host_key == "sunshine-live.de":
+        candidates = _sunshine_live_candidates(raw_html, page_url)
+        if len(candidates) >= 5 or urlparse(page_url).path.rstrip("/") == "/music/channels":
+            return candidates
+        try:
+            response = requests.get(
+                "https://www.sunshine-live.de/music/channels",
+                timeout=(5, settings.playlist_timeout_seconds),
+                headers={"User-Agent": settings.user_agent, "Accept": "text/html,application/xhtml+xml,*/*"},
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            return candidates
+        return _sunshine_live_candidates(response.text[:2_500_000], "https://www.sunshine-live.de/music/channels")
+
+    if host_key == "80s80s.de":
+        candidates = _eighties_candidates(raw_html, page_url)
+        if len(candidates) >= 10 or urlparse(page_url).path.rstrip("/") == "/streams":
+            return candidates
+        try:
+            response = requests.get(
+                "https://www.80s80s.de/streams",
+                timeout=(5, settings.playlist_timeout_seconds),
+                headers={"User-Agent": settings.user_agent, "Accept": "text/html,application/xhtml+xml,*/*"},
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            return candidates
+        return _eighties_candidates(response.text[:2_500_000], "https://www.80s80s.de/streams")
+
+    if host_key != "antenne.de":
         return []
 
     candidates: list[StreamCandidate] = []
@@ -132,17 +164,96 @@ def _structured_channel_candidates(soup: BeautifulSoup, page_url: str, page_titl
         card = _nearest_card(play_button)
         name = _antenne_channel_name(card, channel_key, page_title)
         homepage_url = _antenne_channel_homepage(card, page_url, channel_key)
+        audio_url = f"https://play.antenne.de/{channel_key}.m3u"
+        if not _probe_stream_candidate(audio_url):
+            continue
         candidates.append(
             StreamCandidate(
                 name=name,
                 homepage_url=homepage_url,
-                audio_url=f"https://play.antenne.de/{channel_key}.m3u",
+                audio_url=audio_url,
                 audio_mode="m3u",
                 source="antenne.channel",
                 confidence="hoch",
             )
         )
     return candidates
+
+
+def _sunshine_live_candidates(raw_html: str, page_url: str) -> list[StreamCandidate]:
+    pattern = re.compile(r'stream:"([^"]+)"(?:(?!stream:").){0,2500}?url_high:"([^"]+)"', re.DOTALL)
+    candidates: list[StreamCandidate] = []
+    seen_urls: set[str] = set()
+    for raw_name, raw_url in pattern.findall(raw_html):
+        name = _decode_js_string(raw_name)
+        stream_url = _normalize_sunshine_stream_url(_decode_js_string(raw_url))
+        if not name or not stream_url or stream_url in seen_urls:
+            continue
+        seen_urls.add(stream_url)
+        candidates.append(
+            StreamCandidate(
+                name=f"Sunshine Live {name}" if not name.casefold().startswith("sunshine live") else name,
+                homepage_url=page_url,
+                audio_url=stream_url,
+                audio_mode="direct",
+                source="sunshine.nuxt",
+                confidence="hoch",
+            )
+        )
+    return candidates
+
+
+def _eighties_candidates(raw_html: str, page_url: str) -> list[StreamCandidate]:
+    pattern = re.compile(r'stream:"([^"]+)"(?:(?!stream:").){0,2500}?url_high:"([^"]+)"', re.DOTALL)
+    candidates: list[StreamCandidate] = []
+    seen_urls: set[str] = set()
+    for raw_name, raw_url in pattern.findall(raw_html):
+        name = _decode_js_string(raw_name)
+        stream_url = _normalize_eighties_stream_url(_decode_js_string(raw_url))
+        if not name or not stream_url or stream_url in seen_urls:
+            continue
+        seen_urls.add(stream_url)
+        candidates.append(
+            StreamCandidate(
+                name=name if name.casefold().startswith("80s80s") else f"80s80s {name}",
+                homepage_url=page_url,
+                audio_url=stream_url,
+                audio_mode="direct",
+                source="80s80s.nuxt",
+                confidence="hoch",
+            )
+        )
+    return candidates
+
+
+def _decode_js_string(value: str) -> str:
+    try:
+        decoded = json.loads(f'"{value}"')
+    except json.JSONDecodeError:
+        decoded = value.replace(r"\u002F", "/").replace(r"\/", "/")
+    return _visible_label(html.unescape(decoded))
+
+
+def _normalize_sunshine_stream_url(value: str) -> str:
+    url = value.strip()
+    if url.startswith("//"):
+        url = f"https:{url}"
+    elif url.startswith("http://"):
+        url = f"https://{url[7:]}"
+    if not url.startswith("https://stream.sunshine-live.de/"):
+        return ""
+    return url
+
+
+def _normalize_eighties_stream_url(value: str) -> str:
+    url = value.strip()
+    if url.startswith("//"):
+        url = f"https:{url}"
+    elif url.startswith("http://"):
+        url = f"https://{url[7:]}"
+    if not url.startswith("https://streams.80s80s.de/"):
+        return ""
+    return url
 
 
 def _extract_urls(soup: BeautifulSoup, raw_html: str, base_url: str) -> list[tuple[str, str, str, bool]]:
@@ -330,7 +441,7 @@ def _probe_stream_candidate(url: str) -> bool:
             stream=True,
             allow_redirects=True,
             timeout=(3, 4),
-            headers={"User-Agent": settings.user_agent, "Accept": "*/*", "Range": "bytes=0-1"},
+            headers={"User-Agent": settings.user_agent, "Accept": "*/*", "Range": "bytes=0-65535"},
         )
     except requests.RequestException:
         return False
@@ -340,6 +451,8 @@ def _probe_stream_candidate(url: str) -> bool:
         content_type = (response.headers.get("Content-Type") or "").casefold()
         if "text/html" in content_type:
             return False
+        if _path_extension(urlparse(url).path.casefold()) in PLAYLIST_EXTENSIONS:
+            return _probe_playlist_response(response)
         if content_type.startswith("audio/"):
             return True
         if any(marker in content_type for marker in ("mpegurl", "x-scpls", "octet-stream")):
@@ -347,6 +460,28 @@ def _probe_stream_candidate(url: str) -> bool:
         return not content_type
     finally:
         response.close()
+
+
+def _probe_playlist_response(response: requests.Response) -> bool:
+    try:
+        payload = b""
+        for chunk in response.iter_content(chunk_size=4096):
+            if not chunk:
+                continue
+            payload += chunk
+            if len(payload) >= 65536:
+                break
+    except requests.RequestException:
+        return False
+    text = payload.decode(response.encoding or "utf-8", errors="ignore")
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or line.startswith("["):
+            continue
+        if line.startswith(("File", "file")) and "=" in line:
+            line = line.split("=", 1)[1].strip()
+        return line.startswith(("http://", "https://"))
+    return False
 
 
 def _trim_url(url: str) -> str:

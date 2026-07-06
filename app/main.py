@@ -1031,6 +1031,8 @@ async def station_stream(station_id: str) -> RedirectResponse:
         resolved_url = await services.resolve_station_stream(station_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Unbekannter Sender") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Stream konnte nicht geöffnet werden: {exc}") from exc
     return RedirectResponse(url=resolved_url, status_code=307)
 
 

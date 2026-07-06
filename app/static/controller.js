@@ -3,11 +3,15 @@ const pollIntervalMs = Number(window.__POLL_INTERVAL_MS__ || 15000);
 let stations = Array.isArray(window.__STATIONS__) ? window.__STATIONS__ : [];
 let hiddenStationIds = Array.isArray(state.config?.hidden_station_ids) ? state.config.hidden_station_ids : [];
 let selectedStationId = state.station?.id || stations[0]?.id || null;
+let selectedProviderId = null;
 let bluetoothState = { renderers: [] };
 let lastTrackKey = null;
 let localVolumeCommitTimer = null;
 
 const stationList = document.getElementById('stationList');
+const providerSelect = document.getElementById('providerSelect');
+const stationSelect = document.getElementById('stationSelect');
+const stationRemoveButton = document.getElementById('stationRemoveButton');
 const stationForm = document.getElementById('stationForm');
 const stationNameInput = document.getElementById('stationNameInput');
 const stationHomepageInput = document.getElementById('stationHomepageInput');
@@ -74,54 +78,121 @@ function selectedStation() {
   return stations.find((station) => station.id === selectedStationId) || stations[0] || null;
 }
 
-function renderStationList() {
-  stationList.innerHTML = '';
+function stationProvider(station) {
+  const value = [
+    station.id || '',
+    station.name || '',
+    station.homepage_url || '',
+    station.audio_url || '',
+  ].join(' ').toLowerCase();
+  if (value.includes('80s80s')) {
+    return { id: '80s80s', name: '80s80s' };
+  }
+  if (value.includes('sunshine-live')) {
+    return { id: 'sunshine-live', name: 'Sunshine Live' };
+  }
+  if (value.includes('antenne.de') || value.includes('antenne bayern') || value.includes('play.antenne')) {
+    return { id: 'antenne-bayern', name: 'ANTENNE BAYERN' };
+  }
+  if (value.includes('onradio') || value.includes('0nradio') || value.includes('radionetz.de') || (station.id || '').startsWith('on-')) {
+    return { id: 'on-radio', name: 'ON Radio' };
+  }
+  const host = providerHost(station.homepage_url) || providerHost(station.audio_url);
+  if (host) {
+    return { id: `host-${host.replace(/[^a-z0-9]+/g, '-')}`, name: providerNameFromHost(host) };
+  }
+  if (station.custom) {
+    return { id: 'custom', name: 'Eigene Sender' };
+  }
+  return { id: 'other', name: 'Weitere Anbieter' };
+}
+
+function providerHost(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.replace(/^www\./, '').replace(/^stream\./, '').replace(/^streams\./, '').replace(/^play\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function providerNameFromHost(host) {
+  const cleanHost = host.replace(/\.[a-z]{2,}$/, '');
+  return cleanHost
+    .split(/[.-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function stationProviderGroups() {
+  const groupsById = new Map();
   for (const station of stations) {
-    const row = document.createElement('div');
-    row.className = 'station-list-item';
-    row.dataset.stationId = station.id;
+    const provider = stationProvider(station);
+    if (!groupsById.has(provider.id)) {
+      groupsById.set(provider.id, { ...provider, stations: [] });
+    }
+    groupsById.get(provider.id).stations.push(station);
+  }
+  return Array.from(groupsById.values());
+}
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'station-list-button';
-    button.dataset.stationId = station.id;
-    button.setAttribute('role', 'option');
-    button.textContent = station.name;
-    button.addEventListener('click', () => {
-      selectStation(station.id).catch((error) => console.error(error));
-    });
+function currentProviderGroup(groups = stationProviderGroups()) {
+  return groups.find((group) => group.id === selectedProviderId) || groups[0] || null;
+}
 
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.className = 'station-remove-button';
-    removeButton.dataset.stationId = station.id;
-    removeButton.setAttribute('aria-label', `${station.name} entfernen`);
-    removeButton.title = station.custom ? 'Sender löschen' : 'Standardsender ausblenden';
-    removeButton.textContent = '×';
-    removeButton.addEventListener('click', () => {
-      removeStation(station.id, station.name).catch((error) => {
-        setStationManagerMessage(readableError(error), true);
-      });
-    });
+function renderStationList() {
+  const groups = stationProviderGroups();
+  const station = selectedStation();
+  const activeProviderId = station ? stationProvider(station).id : null;
+  if (!selectedProviderId || !groups.some((group) => group.id === selectedProviderId)) {
+    selectedProviderId = activeProviderId || groups[0]?.id || null;
+  }
+  const providerGroup = currentProviderGroup(groups);
 
-    row.append(button, removeButton);
-    stationList.appendChild(row);
+  providerSelect.innerHTML = '';
+  for (const group of groups) {
+    const option = document.createElement('option');
+    option.value = group.id;
+    option.textContent = `${group.name} (${group.stations.length})`;
+    providerSelect.appendChild(option);
+  }
+  if (!groups.length) {
+    const emptyProviderOption = document.createElement('option');
+    emptyProviderOption.value = '';
+    emptyProviderOption.textContent = 'Noch keine Anbieter vorhanden';
+    providerSelect.appendChild(emptyProviderOption);
+  }
+  providerSelect.value = selectedProviderId || '';
+
+  stationSelect.innerHTML = '';
+  for (const station of providerGroup?.stations || []) {
+    const option = document.createElement('option');
+    option.value = station.id;
+    option.textContent = station.name;
+    stationSelect.appendChild(option);
   }
   if (!stations.length) {
-    const empty = document.createElement('p');
-    empty.className = 'controller-inline-note';
-    empty.textContent = 'Noch keine Sender vorhanden.';
-    stationList.appendChild(empty);
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = 'Noch keine Sender vorhanden';
+    stationSelect.appendChild(emptyOption);
   }
   syncStationButtons();
   syncStationManager();
 }
 
 function syncStationButtons() {
-  for (const button of stationList.querySelectorAll('.station-list-button')) {
-    const isActive = button.dataset.stationId === selectedStationId;
-    button.classList.toggle('is-active', isActive);
-    button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  const station = selectedStation();
+  if (station) {
+    stationSelect.value = station.id;
+    stationRemoveButton.disabled = false;
+    stationRemoveButton.title = station.custom ? 'Eigenen Stream löschen' : 'Standardstream ausblenden';
+  } else {
+    providerSelect.value = selectedProviderId || '';
+    stationSelect.value = '';
+    stationRemoveButton.disabled = true;
+    stationRemoveButton.title = 'Kein Stream ausgewählt';
   }
 }
 
@@ -413,6 +484,8 @@ function applyState(nextState) {
   }
   if (nextState.station && nextState.station.id) {
     selectedStationId = nextState.station.id;
+    selectedProviderId = stationProvider(nextState.station).id;
+    renderStationList();
   }
   animateSwitchIfNeeded(nextState);
   syncStationButtons();
@@ -531,6 +604,9 @@ async function addStationFromForm() {
 }
 
 async function removeStation(stationId, stationNameValue) {
+  if (!stationId) {
+    return;
+  }
   const confirmed = window.confirm(`${stationNameValue} aus der Senderliste entfernen?`);
   if (!confirmed) {
     return;
@@ -539,6 +615,18 @@ async function removeStation(stationId, stationNameValue) {
   const nextState = await deleteJson(`/api/stations/${encodeURIComponent(stationId)}`);
   applyState(nextState);
   setStationManagerMessage(`${stationNameValue} entfernt.`);
+}
+
+async function removeSelectedStation() {
+  const station = selectedStation();
+  if (!station) {
+    return;
+  }
+  try {
+    await removeStation(station.id, station.name);
+  } catch (error) {
+    setStationManagerMessage(readableError(error), true);
+  }
 }
 
 async function restoreStations() {
@@ -690,7 +778,11 @@ async function selectStation(stationId) {
 
   const wasPlaying = !player.paused;
   selectedStationId = stationId;
-  syncStationButtons();
+  const nextStation = selectedStation();
+  if (nextStation) {
+    selectedProviderId = stationProvider(nextStation).id;
+  }
+  renderStationList();
 
   const nextState = await postJson('/api/select', { station_id: stationId });
   applyState(nextState);
@@ -1071,6 +1163,31 @@ checkUpdateButton.addEventListener('click', () => {
 applyUpdateButton.addEventListener('click', () => {
   applyUpdate().catch((error) => {
     updateStatusText.textContent = readableError(error);
+  });
+});
+
+stationSelect.addEventListener('change', () => {
+  selectStation(stationSelect.value).catch((error) => {
+    setStationManagerMessage(readableError(error), true);
+  });
+});
+
+providerSelect.addEventListener('change', () => {
+  selectedProviderId = providerSelect.value;
+  const group = currentProviderGroup();
+  renderStationList();
+  const firstStation = group?.stations?.[0] || null;
+  if (!firstStation) {
+    return;
+  }
+  selectStation(firstStation.id).catch((error) => {
+    setStationManagerMessage(readableError(error), true);
+  });
+});
+
+stationRemoveButton.addEventListener('click', () => {
+  removeSelectedStation().catch((error) => {
+    setStationManagerMessage(readableError(error), true);
   });
 });
 
