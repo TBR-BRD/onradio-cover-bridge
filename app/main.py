@@ -141,6 +141,9 @@ class AppServices:
         self.update_service = UpdateService(PROJECT_DIR)
         self.poll_task: asyncio.Task[None] | None = None
         self.last_upnp_watchdog_attempt_at = 0.0
+        self.relay_failure_station_id: str | None = None
+        self.relay_failure_at = 0.0
+        self.relay_failure_retuned_at = 0.0
         self.started_at = time.time()
 
     async def start(self) -> None:
@@ -775,15 +778,44 @@ class AppServices:
             return
 
         audio_state = await asyncio.to_thread(self._build_audio_state, config_copy)
-        if audio_state.route_kind != "upnp" or not audio_state.supports_transport or audio_state.transport_playing:
+        relay_failure_recent = self._relay_failure_recent_for(station.id, now)
+        if audio_state.route_kind != "upnp" or not audio_state.supports_transport:
+            return
+        if audio_state.transport_playing and not relay_failure_recent:
             return
 
         self.last_upnp_watchdog_attempt_at = now
-        logger.warning(
-            "UPnP-Watchdog startet %s neu, weil der Transport nicht mehr spielt",
-            station.id,
-        )
+        if relay_failure_recent:
+            self.relay_failure_retuned_at = now
+            logger.warning(
+                "UPnP-Watchdog startet %s neu, weil der Relay zuletzt keine Audiodaten mehr geliefert hat",
+                station.id,
+            )
+        else:
+            logger.warning(
+                "UPnP-Watchdog startet %s neu, weil der Transport nicht mehr spielt",
+                station.id,
+            )
         await self._set_upnp_output_playback(config_copy, True)
+
+    def note_upnp_relay_interruption(self, station_id: str) -> None:
+        self.relay_failure_station_id = station_id
+        self.relay_failure_at = time.monotonic()
+
+    def note_upnp_relay_recovered(self, station_id: str) -> None:
+        if self.relay_failure_station_id == station_id:
+            self.relay_failure_station_id = None
+            self.relay_failure_at = 0.0
+            self.relay_failure_retuned_at = 0.0
+
+    def _relay_failure_recent_for(self, station_id: str, now: float) -> bool:
+        if self.relay_failure_station_id != station_id:
+            return False
+        if now - self.relay_failure_at > 120:
+            return False
+        if now - self.relay_failure_retuned_at < max(5, settings.upnp_playback_watchdog_cooldown_seconds):
+            return False
+        return True
 
 
 services = AppServices()
@@ -1100,6 +1132,7 @@ async def upnp_station_stream(station_id: str, request: Request) -> Response:
 
                     try:
                         current_upstream = _open_upnp_upstream(upstream_url)
+                        services.note_upnp_relay_recovered(station.id)
                         logger.info(
                             "UPnP-Relay fuer %s nach Unterbrechung neu verbunden (Versuch %s/%s)",
                             station.id,
@@ -1127,8 +1160,10 @@ async def upnp_station_stream(station_id: str, request: Request) -> Response:
                         logger.warning("UPnP-Relay-Stream fuer %s wurde vom Upstream beendet", station.id)
                     else:
                         logger.warning("UPnP-Relay-Stream fuer %s endete ohne Audiodaten", station.id)
+                    services.note_upnp_relay_interruption(station.id)
                 except requests.RequestException as exc:
                     logger.warning("UPnP-Relay-Stream fuer %s wurde unterbrochen: %s", station.id, exc)
+                    services.note_upnp_relay_interruption(station.id)
 
                 _close_upnp_upstream(current_upstream)
                 current_upstream = None
