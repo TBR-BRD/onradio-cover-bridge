@@ -6,156 +6,243 @@
 ![Chromium](https://img.shields.io/badge/Chromium-Kiosk-4285F4?logo=googlechrome&logoColor=white)
 ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD)
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
+![Android](https://img.shields.io/badge/BBuzzCanvas-Android%205.1-3DDC84?logo=android&logoColor=white)
 
-Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller**, **editierbarer Senderliste**, **Webstream-Suche**, **Albumcover**, **Uhrzeit**, **Wetter**, **QR-Code** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
+Ein Raspberry-Pi-basiertes Radio- und Infodisplay mit **Mobile-Webcontroller**, **Albumcover**, **Titelinformationen**, **Uhrzeit**, **Wetter**, **QR-Code**, **Systemmonitoring** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
 
-**Short English summary:**
-
-**OnRadio Cover Bridge** is a Raspberry Pi–based internet radio and information display for home networks. It runs as a kiosk-style display on a Raspberry Pi with a 7-inch screen and can be controlled from a smartphone. The system shows album covers, track information, time, date, weather, QR access code, and playback status, while streaming audio to WLAN/UPnP speakers such as Sonos or Denon. It is built with FastAPI, Chromium kiosk mode, systemd services, and Python.
-
-[1]: https://github.com/TBR-BRD/onradio-cover-bridge "GitHub - TBR-BRD/onradio-cover-bridge: onradio-cover-bridge · GitHub"
-
-
-<br>
-<a href="https://www.buymeacoffee.com/thoralf.brandt" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174">
-</a>
-<br>
-
-Das System ist für einen Raspberry Pi 3 mit offiziellem 7-Zoll-Display als dauerhaft laufendes Kiosk-Display im Heimnetz gedacht.  
-Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone im gleichen WLAN.
-
-![Mein Aufbau](docs/media/rpi-oberflaeche-qr.png)
-
-Foto der RPi Oberfläche
-
-![Mein Aufbau](docs/media/controller.png)
-
-Controller Oberfläche
+Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokalen Raspberry-Pi-Display kann ein separates **BBuzzCanvas** als zusätzliches Fullscreen-Coverdisplay genutzt werden.
 
 ## Highlights
 
-- Internetradio-Steuerung per Smartphone im Heimnetz
-- Albumcover, Titelinfos, Uhrzeit und Wetter auf dem Raspberry-Pi-Display
+- Internetradio-Steuerung per Smartphone im lokalen Netzwerk
+- Albumcover, Titel, Interpret, Uhrzeit, Datum und Wetter auf dem Raspberry-Pi-Display
+- separates Fullscreen-Coverdisplay auf einem BBuzzCanvas
 - Ausgabe auf WLAN-/UPnP-Lautsprecher wie Sonos oder Denon
-- Touch-Bedienung direkt am Raspberry Pi
+- Touch-Bedienung direkt auf dem Raspberry Pi
 - QR-Code für schnellen Zugriff auf den Webcontroller
-- Übersichtliche Anbieter- und Stream-Auswahl per zwei Drop-downs
-- Sender direkt im Controller hinzufügen, ausblenden, löschen und wiederherstellen
-- Streamsuche auf Anbieter-Webseiten mit direkter Übernahme in die persönliche Senderliste
-- Automatischer Kiosk-Start nach dem Boot
-- Automatische Diagnose-Seite für Stream, Wetter, Audio, UPnP, Updates und Pi-Systemdaten
-- Verbesserte Update-Statusseite im Controller
-- Optimiert für kleine Raspberry-Pi-Touchdisplays
+- CPU-, RAM-, Temperatur-, Load-, Throttling- und Uptime-Anzeige im Controller
+- automatischer Start des Webdienstes und des Raspberry-Pi-Kiosk-Browsers
+- Display-Zeitfenster für den Raspberry Pi
 
-## Features
+## Aktueller Aufbau
+
+![Mein Aufbau](docs/media/mein-aufbau.jpg)
+
+## BBuzzCanvas Cover Display
+
+![BBuzzCanvas Digital Art Display](docs/media/bbuzzcanvas.png)
+
+Als zweites Display kann ein BBuzzCanvas verwendet werden. Es zeigt ausschließlich das aktuelle Albumcover im Fullscreen-Modus.
+
+Cover-Endpunkt:
+
+```text
+http://<PI-IP>:8080/cover
+```
+
+Für das aktuell verwendete BBuzzCanvas ist aufgrund der Displayausrichtung folgende Variante geeignet:
+
+```text
+http://<PI-IP>:8080/cover?rotate=left
+```
+
+Die passende Android-5.1-Kiosk-App befindet sich in einem separaten Repository:
+
+https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
+
+## Funktionen
 
 ### Radio / Sender
+
 - Auswahl vieler Internetradio-Sender über den Mobile-Webcontroller
-- Senderauswahl nach Anbieter und Stream getrennt, z. B. ON Radio, 80s80s und Sunshine Live
+- Senderliste als direkt anklickbare Liste ohne Drop-down
 - Start / Stop der Wiedergabe
 - Senderwechsel per Mobile-Controller
 - Senderwechsel zusätzlich direkt auf dem Raspberry-Pi-Display
 - Wiedergabe über WLAN-/UPnP-Lautsprecher
-- Eigene Sender mit Name, Homepage, Stream-URL und Audio-Modus hinzufügen
-- Standardsender ausblenden und bei Bedarf wiederherstellen
-- Senderliste aktualisiert sich nach Änderungen automatisch im Controller
-- Webseiten nach verfügbaren Audio-Streams durchsuchen und Treffer direkt aufnehmen
-- Spezielle Erkennung für Anbieterlisten wie `https://www.antenne.de/webradio/`, `https://www.sunshine-live.de/music/channels`, `https://www.80s80s.de/streams`, `https://www.radiobob.de/musik/streams`, `https://www.ffh.de/webradio`, `https://www.absolutradio.de/` und `https://www.energy.de/streams`
-- Erweiterte Standardsenderlisten für 80s80s, Sunshine Live, RADIO BOB!, HIT RADIO FFH, Absolut Radio und ENERGY/NRJ
+- Stream-Relay über den Raspberry Pi für bessere Renderer-Kompatibilität
 
-### Anzeige
-- Großes Cover links
+### Titelinformationen und Metadaten
+
+- Anzeige von Sendername, Titel und Interpret
+- automatische Aktualisierung der Metadaten
+- mehrere Metadatenquellen je nach Sender
+- Fallback auf ICY-Metadaten oder senderabhängige Playlist-/Webquellen
+- spezielle Behandlung einzelner Sender, wenn deren Metadatenformat abweicht
+
+### Cover-Anzeige
+
+- Anzeige des aktuellen Albumcovers
+- bevorzugte Nutzung geeigneter Coverquellen
+- lokale Auslieferung externer Cover über einen Cover-Proxy
+- Fallback-Logik bei nicht erreichbaren Cover-URLs
+- eigenes Platzhalterbild bei fehlendem Albumcover
+- separate `/cover`-Seite für reine Fullscreen-Anzeige
+- Rotation der Fullscreen-Coverseite per URL-Parameter
+
+### Raspberry-Pi-Display
+
+- Kiosk-Oberfläche unter `/display`
+- großes Cover links
 - Titel und Interpret rechts
-- Große Uhrzeit und Datum
+- große Uhrzeit und Datum
 - QR-Code zum Controller
-- Controller-Adresse direkt auf dem Display
-- Ausgabeanzeige für den aktiven Lautsprecher
+- kompakte Ausgabeanzeige für den aktiven Lautsprecher
 - Wetteranzeige für Falkensee
-
-### Coverquellen
-- Direkte Coverdaten aus Sender- und Stream-Metadaten
-- Apple iTunes Search API als schneller Cover-Fallback
-- MusicBrainz / Cover Art Archive als offener Datenbank-Fallback
-- Amazon-Suche als letzter Fallback, wenn die offiziellen Quellen kein Cover liefern
-- Cover werden nicht dauerhaft auf der SD-Karte gespeichert; der Cover-Proxy nutzt nur kurzlebige RAM-/Browser-Caches
+- Touch-Bedienung direkt am Display
+- Shutdown-Button für den Raspberry Pi
+- automatischer Kiosk-Start nach dem Boot
+- Mauszeiger im Kiosk-Betrieb ausgeblendet
+- Display-Zeitfenster standardmäßig von 08:00 bis 22:00 Uhr
 
 ### Wetter
-- aktueller Zustand
+
+- aktueller Wetterzustand für Falkensee
 - aktuelle Temperatur
 - Luftdruck
 - Luftdruck-Trendpfeil
 - Vorhersage für heute und morgen
-- Wettersymbole
+- lokale Wettersymbole
+- serverseitiges Caching der Wetterdaten
 
-### System
-- FastAPI-Webserver
-- Chromium-Kiosk auf dem Pi
-- systemd-Service
-- Display bleibt dauerhaft aktiv
-- Diagnose-Seite unter `/diagnostics`
-- Update-Seite mit Git-/Commit-/Remote-Status
-- Lokale Controller-Konfiguration in `data/config.json`
-- Automatische Konfigurations-Backups in `data/backups/`
-- Shutdown-Button auf dem Pi
-- Kiosk-Start unterdrückt GNOME-Keyring-Prompts
-- Hintergrundfehler werden unauffällig behandelt
+### Mobile-Webcontroller
 
-## Zusätzliches BBuzzCanvas Cover Display
+Der Controller ist unter folgender URL erreichbar:
 
-Neben dem Raspberry-Pi-Display kann ein separates BBuzzCanvas als reines Fullscreen-Coverdisplay verwendet werden.
+```text
+http://<PI-IP>:8080/controller
+```
 
-<p align="center">
-  <img src="docs/media/bbuzzcanvas.png" alt="BBuzzCanvas Cover Display" width="650">
-</p>
+Funktionen:
 
-Das BBuzzCanvas ruft die Cover-Seite des Raspberry Pi auf:
+- Senderauswahl
+- Wiedergabesteuerung
+- Lautstärkesteuerung
+- Auswahl des WLAN-/UPnP-Ausgabegeräts
+- Suche nach verfügbaren UPnP-/DLNA-Renderern
+- Uhrzeit, Datum und Wetter
+- Konfiguration des Display-Zeitfensters
+- Backup- und Wartungsfunktionen
+- Systemmonitoring des Raspberry Pi
 
-`http://<PI-IP>:8080/cover`
+### Systemmonitor im Controller
 
-Für das Android-5.1-Gerät gibt es eine kleine Kiosk-App mit Fullscreen-Anzeige, Autostart und konfigurierbarer URL.
+Der Systemmonitor wird ausschließlich im Webcontroller angezeigt und belastet die eigentlichen Displays nicht mit zusätzlichen Informationen.
 
-Android-Projekt:
+Angezeigt werden:
+
+- CPU-Auslastung
+- CPU-Maximum der letzten fünf Minuten
+- RAM-Auslastung
+- CPU-Temperatur
+- Load Average
+- Throttling / Unterspannung
+- System-Uptime
+
+API:
+
+```text
+http://<PI-IP>:8080/api/system
+```
+
+### WLAN-/UPnP-Lautsprecher
+
+- automatische Erkennung von UPnP-/DLNA-Media-Renderern im lokalen Netzwerk
+- Auswahl eines aktiven Ausgabegeräts
+- Unterstützung für Sonos- und Denon-ähnliche Renderer
+- lokaler Stream-Relay über den Raspberry Pi
+- Anzeige des aktiven Lautsprechernamens auf dem Display
+- Audio-Ausgabe am Raspberry Pi selbst ist nicht erforderlich
+
+### BBuzzCanvas Android-Kiosk
+
+Das BBuzzCanvas verwendet eine kleine Android-5.1-kompatible WebView-Kiosk-App.
+
+Funktionen der Android-App:
+
+- Fullscreen-/Immersive-Modus
+- Status- und Navigationsleiste ausgeblendet
+- Bildschirm bleibt eingeschaltet
+- Cover-URL beim ersten Start konfigurierbar
+- URL später per Langdruck änderbar
+- automatische Wiederverbindung bei Ladefehlern
+- Autostart nach Android-Boot
+- keine private IP-Adresse fest im Quellcode
+
+Projekt:
 
 https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 
 ## Architektur
 
 ```text
-Smartphone / iPhone
-        |
-        | HTTP / WLAN
-        v
-+----------------------+
-|   Raspberry Pi 3     |
-|----------------------|
-| FastAPI Webserver    |
-| Kiosk-Display        |
-| Cover-Logik          |
-| Wetterdienst         |
-| UPnP Stream Relay    |
-+----------------------+
-        |            \
-        |             \
-        v              v
-  7" Raspberry        WLAN-/UPnP-
-  Pi Display          Lautsprecher
+                         Smartphone / Browser
+                                |
+                                | HTTP / WLAN
+                                v
+                  +-----------------------------+
+                  |       Raspberry Pi 3        |
+                  |    OnRadio Cover Bridge     |
+                  |-----------------------------|
+                  | FastAPI Webserver           |
+                  | Radio-/Senderlogik          |
+                  | Stream-Auflösung            |
+                  | Metadaten / Titel           |
+                  | Cover-Auflösung / Proxy     |
+                  | Wetterdienst                |
+                  | Controller API              |
+                  | Systemmonitoring            |
+                  | UPnP / Audio Control        |
+                  +-------------+---------------+
+                                |
+            +-------------------+--------------------+
+            |                   |                    |
+            v                   v                    v
+     Raspberry Pi          BBuzzCanvas           WLAN / UPnP
+     7" Display            Android 5.1           Lautsprecher
+     /display              Kiosk-App             Sonos / Denon
+                            /cover
+                            /cover?rotate=left
 ```
+
+### Datenfluss
+
+1. Der Mobile-Webcontroller sendet Steuerbefehle an den Raspberry Pi.
+2. Der Raspberry Pi verwaltet Sender, Stream-URLs und Wiedergabestatus.
+3. Titel und Interpret werden aus den verfügbaren Metadatenquellen ermittelt.
+4. Das passende Albumcover wird aufgelöst und bei Bedarf über den lokalen Cover-Proxy bereitgestellt.
+5. Das Raspberry-Pi-Display ruft `/display` auf und zeigt die vollständige Informationsoberfläche.
+6. Das BBuzzCanvas ruft `/cover` auf und zeigt ausschließlich das aktuelle Cover.
+7. Der ausgewählte WLAN-/UPnP-Lautsprecher erhält den Radio-Stream über den Raspberry Pi.
+8. Der Controller ruft zusätzlich `/api/system` für die Systemzustandsanzeige ab.
+
+## Wichtige URLs
+
+| Funktion | URL |
+| --- | --- |
+| Mobile-Webcontroller | `http://<PI-IP>:8080/controller` |
+| Raspberry-Pi-Display | `http://<PI-IP>:8080/display` |
+| BBuzzCanvas Cover | `http://<PI-IP>:8080/cover` |
+| BBuzzCanvas gedreht | `http://<PI-IP>:8080/cover?rotate=left` |
+| Status-API | `http://<PI-IP>:8080/api/state` |
+| Systemmonitor | `http://<PI-IP>:8080/api/system` |
+| UPnP-Status | `http://<PI-IP>:8080/api/upnp/state` |
 
 ## Voraussetzungen
 
 - Raspberry Pi 3
 - Raspberry Pi OS mit Desktop
-- offizielles Raspberry Pi Display
-- WLAN im lokalen Netzwerk
+- offizielles Raspberry Pi 7-Zoll-Display
+- WLAN oder LAN im lokalen Netzwerk
 - Smartphone / iPhone für den Controller
-- WLAN-/UPnP-Lautsprecher
+- UPnP-/DLNA-kompatibler WLAN-Lautsprecher
 - Python 3
 - Chromium im Kiosk-Modus
+- optional: BBuzzCanvas mit Android 5.1 und BBuzzCanvas Cover Kiosk App
 
 ## Schnellstart
 
-### 1. System vorbereiten
+### 1. Raspberry Pi vorbereiten
 
 ```bash
 sudo apt update
@@ -167,7 +254,7 @@ sudo raspi-config nonint do_boot_wait 1
 sudo raspi-config nonint do_blanking 1
 ```
 
-### 2. Projekt auf den Pi kopieren
+### 2. Projekt auf den Raspberry Pi kopieren
 
 ```bash
 scp onradio-cover-bridge.zip pi@<PI-IP>:~
@@ -198,9 +285,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
 Danach testen:
+
 - Controller: `http://<PI-IP>:8080/controller`
-- Diagnose: `http://<PI-IP>:8080/diagnostics`
-- Display: `http://127.0.0.1:8080/display`
+- Display: `http://<PI-IP>:8080/display`
+- Coverdisplay: `http://<PI-IP>:8080/cover`
 
 ### 5. systemd-Service einrichten
 
@@ -228,7 +316,7 @@ mkdir -p /home/pi/.config/labwc
 printf '/home/pi/start-radio-display.sh\n' > /home/pi/.config/labwc/autostart
 ```
 
-### 8. Mauszeiger ausblenden / Kiosk stabilisieren
+### 8. Mauszeiger ausblenden
 
 ```bash
 bash /opt/onradio-cover-bridge/scripts/install-labwc-hide-cursor.sh
@@ -240,22 +328,82 @@ bash /opt/onradio-cover-bridge/scripts/install-labwc-hide-cursor.sh
 sudo reboot
 ```
 
-## Aufruf
+Für die vollständige Installation siehe:
 
-- Mobile-Controller: `http://<PI-IP>:8080/controller`
-- Diagnose-Seite: `http://<PI-IP>:8080/diagnostics`
-- Raspberry-Pi-Display: `http://127.0.0.1:8080/display`
+- [`INSTALLATION_DE.md`](INSTALLATION_DE.md)
+- [`INSTALLATION_EN.md`](INSTALLATION_EN.md)
 
-## Hinweise
+## Diagnose
 
-- Die Audio-Ausgabe kann im Controller zwischen lokalem Raspberry-Pi-Audio und WLAN-/UPnP-Lautsprechern gewählt werden.
-- Eigene Sender werden lokal in `data/config.json` gespeichert. Diese Datei wird nicht ins GitHub-Repository übernommen.
-- Nicht belastbar verifizierte Streams können aus der Senderliste entfernt werden; Standardsender werden dabei ausgeblendet und können wiederhergestellt werden.
-- Die Streamsuche findet direkte Audio-, M3U- und PLS-Links sowie bekannte Anbieterstrukturen. Webseiten, die Streams nur nach Login oder ausschließlich per dynamischer JavaScript/API-Logik ausliefern, können weniger Treffer liefern.
-- Der UPnP-Stream-Relay verbindet sich nach Upstream-Aussetzern automatisch neu; einstellbar über `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS` und `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
-- Der UPnP-Wiedergabe-Watchdog startet unerwartet gestoppte WLAN-Lautsprecher neu; einstellbar über `UPNP_PLAYBACK_WATCHDOG_ENABLED` und `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
-- Die iTunes-Coversuche kann über `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE` und `ITUNES_COVER_QUALITY` angepasst werden.
-- Die iTunes-Covergröße ist standardmäßig auf `1000` Pixel gesetzt; geladene Cover werden nur über `/cover-proxy` ausgeliefert und nicht als Dateien in `data/` abgelegt.
-- Direktupdates im Controller sind nur in einer Git-Installation aktiv; ZIP- oder rsync-Installationen zeigen den Update-Status, starten aber kein Git-Update.
-- Die Diagnose-Seite führt automatisch Selbsttests aus und zeigt Hinweise zu Stream, Metadaten, Wetter, Audio, UPnP, Update-Installation und Raspberry-Pi-Systemdaten.
-- Siehe `INSTALLATION_DE.md` für die vollständige Installationsanleitung.
+Dienststatus:
+
+```bash
+sudo systemctl status onradio-cover.service
+```
+
+Letzte Logs:
+
+```bash
+sudo journalctl -u onradio-cover.service -n 120 --no-pager
+```
+
+System-API:
+
+```bash
+curl http://127.0.0.1:8080/api/system
+```
+
+UPnP-Status:
+
+```bash
+curl http://127.0.0.1:8080/api/upnp/state
+```
+
+## Projektstruktur
+
+```text
+onradio-cover-bridge/
+├── app/
+│   ├── static/
+│   ├── templates/
+│   ├── main.py
+│   ├── stations.py
+│   ├── playlist_fetcher.py
+│   ├── cover_provider.py
+│   ├── weather_service.py
+│   ├── upnp_renderer.py
+│   ├── selftest_service.py
+│   └── config_manager.py
+├── scripts/
+│   ├── start-radio-display.sh
+│   ├── onradio-cover.service
+│   ├── onradio-cover-poweroff.sudoers
+│   └── install-labwc-hide-cursor.sh
+├── docs/
+│   └── media/
+│       └── bbuzzcanvas.png
+├── INSTALLATION_DE.md
+├── INSTALLATION_EN.md
+├── CHANGELOG.md
+├── requirements.txt
+└── README.md
+```
+
+## Verwandtes Projekt
+
+### BBuzzCanvas Cover Kiosk
+
+Android-5.1-kompatible Fullscreen-Kiosk-App für das zusätzliche Coverdisplay:
+
+https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
+
+## Datenschutz und Konfiguration
+
+- Im öffentlichen Repository sollten keine privaten IP-Adressen gespeichert werden.
+- Beispiel-URLs verwenden deshalb `<PI-IP>`.
+- Zugangsdaten, Passwörter oder Tokens gehören nicht in das Repository.
+- Gerätespezifische lokale Konfigurationen sollten außerhalb des öffentlichen Quellcodes gehalten werden.
+
+## Lizenz / externe Inhalte
+
+Eigene Projektdateien können unter einer passenden Open-Source-Lizenz veröffentlicht werden. Externe Sendernamen, Logos, Albumcover und sonstige Medieninhalte unterliegen den jeweiligen Rechten ihrer Anbieter.
