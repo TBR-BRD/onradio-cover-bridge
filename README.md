@@ -24,7 +24,7 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 - automatischer Start des Webdienstes und des Raspberry-Pi-Kiosk-Browsers
 - Display-Zeitfenster für den Raspberry Pi
 
-## Aktueller Aufbau
+## Raspberry Pi Display Oberfläche
 
 ![Mein Aufbau](docs/media/mein-aufbau.png)
 
