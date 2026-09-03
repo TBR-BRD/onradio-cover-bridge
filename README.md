@@ -26,7 +26,7 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 
 ## Aktueller Aufbau
 
-![Mein Aufbau](docs/media/mein-aufbau.jpg)
+![Mein Aufbau](docs/media/mein-aufbau.png)
 
 ## BBuzzCanvas Cover Display
 
