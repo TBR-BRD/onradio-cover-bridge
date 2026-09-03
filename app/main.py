@@ -6,6 +6,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import shlex
 import requests
 import shutil
@@ -864,6 +865,11 @@ async def diagnostics(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "diagnostics.html", context)
 
 
+@app.get("/cover", response_class=HTMLResponse)
+async def cover_display(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(request, "cover.html", {"request": request})
+
+
 @app.get("/display", response_class=HTMLResponse)
 async def display(request: Request) -> HTMLResponse:
     snapshot = await services.snapshot()
@@ -918,6 +924,11 @@ async def get_state() -> dict[str, Any]:
 @app.get("/api/diagnostics")
 async def get_diagnostics() -> dict[str, Any]:
     return await services.get_diagnostics()
+
+
+@app.get("/api/system")
+async def get_system_status() -> dict[str, Any]:
+    return await asyncio.to_thread(_build_system_diagnostics, services.started_at)
 
 
 @app.get("/api/audio/state")
@@ -1294,16 +1305,22 @@ def _controller_host_label(url: str) -> str:
 def _build_system_diagnostics(started_at: float) -> dict[str, Any]:
     disk = shutil.disk_usage(PROJECT_DIR)
     uptime_seconds = max(0, int(time.time() - started_at))
+    system_uptime_seconds = _read_system_uptime_seconds()
     payload: dict[str, Any] = {
         "hostname": socket.gethostname(),
         "python": sys.version.split()[0],
         "app_uptime_seconds": uptime_seconds,
         "app_uptime": _format_duration(uptime_seconds),
+        "system_uptime_seconds": system_uptime_seconds,
+        "system_uptime": _format_duration(system_uptime_seconds) if system_uptime_seconds is not None else None,
         "disk_total_mb": int(disk.total / 1024 / 1024),
         "disk_free_mb": int(disk.free / 1024 / 1024),
         "disk_free_percent": round((disk.free / disk.total) * 100, 1) if disk.total else None,
         "load_average": None,
+        "cpu_percent": _read_cpu_percent(),
         "cpu_temp_c": _read_cpu_temp(),
+        "memory_percent": _read_memory_percent(),
+        "throttling": _read_throttling_state(),
     }
     if hasattr(os, "getloadavg"):
         try:
@@ -1311,6 +1328,92 @@ def _build_system_diagnostics(started_at: float) -> dict[str, Any]:
         except OSError:
             payload["load_average"] = None
     return payload
+
+
+def _read_cpu_times() -> tuple[int, int] | None:
+    try:
+        fields = Path("/proc/stat").read_text(encoding="utf-8").splitlines()[0].split()[1:]
+        values = [int(value) for value in fields]
+        if len(values) < 4:
+            return None
+        idle = values[3] + (values[4] if len(values) > 4 else 0)
+        total = sum(values)
+        return total, idle
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _read_cpu_percent(sample_seconds: float = 0.12) -> float | None:
+    first = _read_cpu_times()
+    if first is None:
+        return None
+    time.sleep(sample_seconds)
+    second = _read_cpu_times()
+    if second is None:
+        return None
+    total_delta = second[0] - first[0]
+    idle_delta = second[1] - first[1]
+    if total_delta <= 0:
+        return None
+    return round(max(0.0, min(100.0, (1.0 - idle_delta / total_delta) * 100.0)), 1)
+
+
+def _read_memory_percent() -> float | None:
+    try:
+        values: dict[str, int] = {}
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if ":" not in line:
+                continue
+            key, raw = line.split(":", 1)
+            number = raw.strip().split()[0]
+            values[key] = int(number)
+        total = values.get("MemTotal", 0)
+        available = values.get("MemAvailable")
+        if available is None:
+            available = values.get("MemFree", 0) + values.get("Buffers", 0) + values.get("Cached", 0)
+        if total <= 0:
+            return None
+        return round(max(0.0, min(100.0, (1.0 - available / total) * 100.0)), 1)
+    except (OSError, ValueError):
+        return None
+
+
+def _read_system_uptime_seconds() -> int | None:
+    try:
+        return max(0, int(float(Path("/proc/uptime").read_text(encoding="utf-8").split()[0])))
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def _read_throttling_state() -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            ["vcgencmd", "get_throttled"],
+            capture_output=True,
+            text=True,
+            timeout=1.0,
+            check=False,
+        )
+        raw = (result.stdout or "").strip()
+        match = re.search(r"0x([0-9a-fA-F]+)", raw)
+        if not match:
+            return {"available": False, "ok": None, "raw": raw or None}
+        value = int(match.group(1), 16)
+        return {
+            "available": True,
+            "ok": value == 0,
+            "raw": f"0x{value:x}",
+            "under_voltage_now": bool(value & 0x1),
+            "frequency_capped_now": bool(value & 0x2),
+            "throttled_now": bool(value & 0x4),
+            "soft_temp_limit_now": bool(value & 0x8),
+            "under_voltage_occurred": bool(value & 0x10000),
+            "frequency_capped_occurred": bool(value & 0x20000),
+            "throttled_occurred": bool(value & 0x40000),
+            "soft_temp_limit_occurred": bool(value & 0x80000),
+        }
+    except (OSError, subprocess.SubprocessError):
+        return {"available": False, "ok": None, "raw": None}
 
 
 def _read_cpu_temp() -> float | None:

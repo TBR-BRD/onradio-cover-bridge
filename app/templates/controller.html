@@ -185,6 +185,14 @@
           <p id="scheduleStatusText" class="controller-inline-note">Anzeige bleibt dauerhaft aktiv.</p>
         </article>
 
+        <article class="panel-soft-card admin-card admin-card-wide">
+          <div class="controller-subheader">
+            <h2>System</h2>
+            <p>Raspberry-Pi-Auslastung · Aktualisierung alle 5 Sekunden</p>
+          </div>
+          <div id="systemStatusGrid" class="status-card-grid"></div>
+          <p id="systemStatusText" class="controller-inline-note">Systemwerte werden geladen…</p>
+        </article>
         <article class="panel-soft-card admin-card">
           <div class="controller-subheader">
             <h2>Selbsttest</h2>
@@ -246,6 +254,6 @@
     window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
     window.__STATIONS__ = {{ stations | tojson }};
   </script>
-  <script src="/static/controller.js?v=20260706b"></script>
+  <script src="/static/controller.js?v=20260903-system"></script>
 </body>
 </html>

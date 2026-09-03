@@ -536,6 +536,103 @@ coverImage.addEventListener('error', () => {
   coverImage.src = '/static/kein-cover.svg?v=20260317b';
 });
 
+
+const systemCpuSamples = [];
+
+function systemSeverity(kind, value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '';
+  }
+  const n = Number(value);
+  if (kind === 'cpu') {
+    return n >= 90 ? 'is-error' : n >= 70 ? 'is-warn' : 'is-ok';
+  }
+  if (kind === 'temp') {
+    return n >= 80 ? 'is-error' : n >= 70 ? 'is-warn' : 'is-ok';
+  }
+  if (kind === 'memory') {
+    return n >= 90 ? 'is-error' : n >= 75 ? 'is-warn' : 'is-ok';
+  }
+  if (kind === 'load') {
+    return n >= 3 ? 'is-error' : n >= 2 ? 'is-warn' : 'is-ok';
+  }
+  return '';
+}
+
+function systemCard(label, value, detail = '', severity = '') {
+  return `
+    <div class="status-card ${severity}">
+      <span class="status-card-label">${escapeHtml(label)}</span>
+      <strong class="status-card-value">${escapeHtml(value)}</strong>
+      ${detail ? `<span class="status-card-detail">${escapeHtml(detail)}</span>` : ''}
+    </div>
+  `;
+}
+
+function formatSystemValue(value, suffix = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '—';
+  }
+  return `${Number(value).toFixed(1)}${suffix}`;
+}
+
+function renderSystemStatus(payload) {
+  const grid = document.getElementById('systemStatusGrid');
+  const note = document.getElementById('systemStatusText');
+  if (!grid || !note) {
+    return;
+  }
+
+  const now = Date.now();
+  const cpu = Number(payload?.cpu_percent);
+  if (Number.isFinite(cpu)) {
+    systemCpuSamples.push({ at: now, value: cpu });
+  }
+  while (systemCpuSamples.length && systemCpuSamples[0].at < now - 5 * 60 * 1000) {
+    systemCpuSamples.shift();
+  }
+  const maxCpu = systemCpuSamples.length
+    ? Math.max(...systemCpuSamples.map((sample) => sample.value))
+    : null;
+
+  const load1 = Array.isArray(payload?.load_average) ? payload.load_average[0] : null;
+  const throttling = payload?.throttling || {};
+  const throttleValue = throttling.available === false
+    ? 'n/a'
+    : throttling.ok
+      ? 'OK'
+      : 'WARNUNG';
+  const throttleDetail = throttling.raw ? `Status ${throttling.raw}` : 'vcgencmd nicht verfügbar';
+
+  grid.innerHTML = [
+    systemCard('CPU', formatSystemValue(payload?.cpu_percent, ' %'), maxCpu === null ? 'Max. 5 min: —' : `Max. 5 min: ${maxCpu.toFixed(1)} %`, systemSeverity('cpu', payload?.cpu_percent)),
+    systemCard('RAM', formatSystemValue(payload?.memory_percent, ' %'), 'Arbeitsspeicher', systemSeverity('memory', payload?.memory_percent)),
+    systemCard('Temperatur', formatSystemValue(payload?.cpu_temp_c, ' °C'), 'CPU', systemSeverity('temp', payload?.cpu_temp_c)),
+    systemCard('Load', load1 === null || load1 === undefined ? '—' : Number(load1).toFixed(2), '1 Minute', systemSeverity('load', load1)),
+    systemCard('Throttling', throttleValue, throttleDetail, throttling.ok === false ? 'is-error' : throttling.ok === true ? 'is-ok' : ''),
+    systemCard('Uptime', payload?.system_uptime || payload?.app_uptime || '—', 'Raspberry Pi'),
+  ].join('');
+
+  note.classList.remove('is-error');
+  if (Number(payload?.cpu_percent) >= 90) {
+    note.textContent = 'Hohe CPU-Auslastung erkannt.';
+    note.classList.add('is-error');
+  } else if (Number(payload?.cpu_temp_c) >= 80) {
+    note.textContent = 'Hohe CPU-Temperatur erkannt.';
+    note.classList.add('is-error');
+  } else if (throttling.ok === false) {
+    note.textContent = 'Der Raspberry Pi meldet Throttling oder Unterspannung.';
+    note.classList.add('is-error');
+  } else {
+    note.textContent = 'Systemwerte normal. CPU-Maximum wird für die letzten 5 Minuten im Browser gespeichert.';
+  }
+}
+
+async function refreshSystemStatus() {
+  const payload = await getJson('/api/system');
+  renderSystemStatus(payload);
+}
+
 async function postJson(url, body) {
   const response = await fetch(url, {
     method: 'POST',
@@ -1230,10 +1327,15 @@ updateClock();
 loadStations().catch((error) => console.error(error));
 refreshBluetoothState().catch((error) => console.error(error));
 refreshBackups().catch((error) => console.error(error));
+refreshSystemStatus().catch((error) => console.error(error));
 
 setInterval(() => {
   loadState().catch(logBackgroundRefreshError);
 }, pollIntervalMs);
+
+setInterval(() => {
+  refreshSystemStatus().catch(logBackgroundRefreshError);
+}, 5000);
 
 setInterval(() => {
   updateClock();
