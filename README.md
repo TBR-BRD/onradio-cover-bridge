@@ -54,6 +54,12 @@ Für das aktuell verwendete BBuzzCanvas ist aufgrund der Displayausrichtung folg
 http://<PI-IP>:8080/cover?rotate=left
 ```
 
+Für eine dezente Anzeige von Interpret und Titel unten rechts kann zusätzlich der Overlay-Parameter aktiviert werden:
+
+```text
+http://<PI-IP>:8080/cover?rotate=left&overlay=1
+```
+
 Die passende Android-5.1-Kiosk-App befindet sich in einem separaten Repository:
 
 https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
@@ -87,6 +93,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 - eigenes Platzhalterbild bei fehlendem Albumcover
 - separate `/cover`-Seite für reine Fullscreen-Anzeige
 - Rotation der Fullscreen-Coverseite per URL-Parameter
+- optionales dezentes Interpret-/Titel-Overlay per `overlay=1`
 
 ### Raspberry-Pi-Display
 
@@ -176,6 +183,19 @@ Funktionen der Android-App:
 - automatische Wiederverbindung bei Ladefehlern
 - Autostart nach Android-Boot
 - keine private IP-Adresse fest im Quellcode
+- Interpret und Titel können ohne APK-Anpassung über den Web-Endpunkt als Overlay eingeblendet werden
+
+### Interpret-/Titel-Overlay
+
+Die Overlay-Funktion wird vollständig vom Raspberry Pi bereitgestellt. Die Android-App muss dafür nicht neu gebaut werden.
+
+Empfohlene URL für das BBuzzCanvas:
+
+```text
+http://<PI-IP>:8080/cover?rotate=left&overlay=1
+```
+
+Das Overlay erscheint klein und dezent unten rechts und aktualisiert sich zusammen mit den Titelinformationen automatisch.
 
 Projekt:
 
@@ -211,6 +231,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
      /display              Kiosk-App             Sonos / Denon
                             /cover
                             /cover?rotate=left
+                            /cover?rotate=left&overlay=1
 ```
 
 ### Datenfluss
@@ -220,7 +241,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 3. Titel und Interpret werden aus den verfügbaren Metadatenquellen ermittelt.
 4. Das passende Albumcover wird aufgelöst und bei Bedarf über den lokalen Cover-Proxy bereitgestellt.
 5. Das Raspberry-Pi-Display ruft `/display` auf und zeigt die vollständige Informationsoberfläche.
-6. Das BBuzzCanvas ruft `/cover` auf und zeigt ausschließlich das aktuelle Cover.
+6. Das BBuzzCanvas ruft `/cover` auf und zeigt das aktuelle Cover. Optional blendet `overlay=1` Interpret und Titel dezent unten rechts ein.
 7. Der ausgewählte WLAN-/UPnP-Lautsprecher erhält den Radio-Stream über den Raspberry Pi.
 8. Der Controller ruft zusätzlich `/api/system` für die Systemzustandsanzeige ab.
 
@@ -232,6 +253,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 | Raspberry-Pi-Display | `http://<PI-IP>:8080/display` |
 | BBuzzCanvas Cover | `http://<PI-IP>:8080/cover` |
 | BBuzzCanvas gedreht | `http://<PI-IP>:8080/cover?rotate=left` |
+| BBuzzCanvas mit Overlay | `http://<PI-IP>:8080/cover?rotate=left&overlay=1` |
 | Status-API | `http://<PI-IP>:8080/api/state` |
 | Systemmonitor | `http://<PI-IP>:8080/api/system` |
 | UPnP-Status | `http://<PI-IP>:8080/api/upnp/state` |
