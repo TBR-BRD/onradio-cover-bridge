@@ -38,6 +38,10 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 
 Als zweites Display kann ein BBuzzCanvas verwendet werden. Es zeigt ausschließlich das aktuelle Albumcover im Fullscreen-Modus.
 
+## BBuzzCanvas Cover Display im Betrieb
+
+![BBuzzCanvas Digital Art Display im Betrieb](docs/media/bbuzzart-cover-1.jpeg)
+
 Cover-Endpunkt:
 
 ```text
