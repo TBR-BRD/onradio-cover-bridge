@@ -28,6 +28,10 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 
 ![Mein Aufbau](docs/media/mein-aufbau.png)
 
+## Controller Browser- Oberfläche
+
+![Mein Aufbau](docs/media/controller.png)
+
 ## BBuzzCanvas Cover Display
 
 ![BBuzzCanvas Digital Art Display](docs/media/bbuzzcanvas.png)
