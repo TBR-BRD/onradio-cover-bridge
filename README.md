@@ -101,6 +101,24 @@ Controller Oberfläche
 - Kiosk-Start unterdrückt GNOME-Keyring-Prompts
 - Hintergrundfehler werden unauffällig behandelt
 
+## Zusätzliches BBuzzCanvas Cover Display
+
+Neben dem Raspberry-Pi-Display kann ein separates BBuzzCanvas als reines Fullscreen-Coverdisplay verwendet werden.
+
+<p align="center">
+  <img src="docs/media/bbuzzcanvas.png" alt="BBuzzCanvas Cover Display" width="650">
+</p>
+
+Das BBuzzCanvas ruft die Cover-Seite des Raspberry Pi auf:
+
+`http://<PI-IP>:8080/cover`
+
+Für das Android-5.1-Gerät gibt es eine kleine Kiosk-App mit Fullscreen-Anzeige, Autostart und konfigurierbarer URL.
+
+Android-Projekt:
+
+https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
+
 ## Architektur
 
 ```text
