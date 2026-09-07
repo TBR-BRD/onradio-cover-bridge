@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Added Google Cast as an audio output (including the Samsung Music Frame): mDNS device discovery, selection in the controller, volume/mute/start/stop.
+- Cast playback hands the resolved station stream directly to the device instead of routing it through the Pi relay, so long-running streams no longer stop after a short time.
+- Added a Cast playback watchdog that automatically restarts an interrupted Cast stream.
+- `/api/playback` now controls Cast devices as well; added `pychromecast` as a dependency.
 - Added Apple iTunes Search API as an additional cover source before MusicBrainz and Amazon.
 - UPnP stream relay now reconnects after upstream timeouts instead of ending the speaker stream.
 - Added a UPnP playback watchdog that restarts Sonos/renderers after unexpected stops.

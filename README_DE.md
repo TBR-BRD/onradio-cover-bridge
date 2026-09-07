@@ -5,9 +5,10 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-Webserver-009688?logo=fastapi&logoColor=white)
 ![Chromium](https://img.shields.io/badge/Chromium-Kiosk-4285F4?logo=googlechrome&logoColor=white)
 ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD)
+![Google Cast](https://img.shields.io/badge/Audio-Google%20Cast-4285F4?logo=googlecast&logoColor=white)
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
 
-Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller**, **editierbarer Senderliste**, **Webstream-Suche**, **Albumcover**, **Uhrzeit**, **Wetter**, **QR-Code** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
+Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller**, **editierbarer Senderliste**, **Webstream-Suche**, **Albumcover**, **Uhrzeit**, **Wetter**, **QR-Code** und **Audio-Ausgabe auf WLAN-/UPnP- und Google-Cast-Lautsprecher** (z. B. Sonos, Denon oder Samsung Music Frame).
 
 Das System ist für einen Raspberry Pi 3 mit offiziellem 7-Zoll-Display als dauerhaft laufendes Kiosk-Display im Heimnetz gedacht.  
 Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone im gleichen WLAN.
@@ -17,6 +18,7 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - Internetradio-Steuerung per Smartphone im Heimnetz
 - Albumcover, Titelinfos, Uhrzeit und Wetter auf dem Raspberry-Pi-Display
 - Ausgabe auf WLAN-/UPnP-Lautsprecher wie Sonos oder Denon
+- Ausgabe auf Google-Cast-Lautsprecher wie den Samsung Music Frame
 - Touch-Bedienung direkt am Raspberry Pi
 - QR-Code für schnellen Zugriff auf den Webcontroller
 - Übersichtliche Anbieter- und Stream-Auswahl per zwei Drop-downs
@@ -36,6 +38,7 @@ Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone i
 - Senderwechsel per Mobile-Controller
 - Senderwechsel zusätzlich direkt auf dem Raspberry-Pi-Display
 - Wiedergabe über WLAN-/UPnP-Lautsprecher
+- Wiedergabe über Google-Cast-Lautsprecher (z. B. Samsung Music Frame)
 - Eigene Sender mit Name, Homepage, Stream-URL und Audio-Modus hinzufügen
 - Standardsender ausblenden und bei Bedarf wiederherstellen
 - Senderliste aktualisiert sich nach Änderungen automatisch im Controller
@@ -95,12 +98,13 @@ Smartphone / iPhone
 | Cover-Logik          |
 | Wetterdienst         |
 | UPnP Stream Relay    |
+| Google-Cast-Steuerung|
 +----------------------+
-        |            \
-        |             \
-        v              v
-  7" Raspberry        WLAN-/UPnP-
-  Pi Display          Lautsprecher
+        |            \        \
+        |             \        \
+        v              v        v
+  7" Raspberry     WLAN-/UPnP-   Google-Cast-
+  Pi Display       Lautsprecher  Lautsprecher
 ```
 
 ## Voraussetzungen
@@ -110,7 +114,7 @@ Smartphone / iPhone
 - offizielles Raspberry Pi Display
 - WLAN im lokalen Netzwerk
 - Smartphone / iPhone für den Controller
-- WLAN-/UPnP-Lautsprecher
+- WLAN-/UPnP-Lautsprecher oder Google-Cast-Lautsprecher (z. B. Samsung Music Frame)
 - Python 3
 - Chromium im Kiosk-Modus
 
@@ -209,12 +213,14 @@ sudo reboot
 
 ## Hinweise
 
-- Die Audio-Ausgabe kann im Controller zwischen lokalem Raspberry-Pi-Audio und WLAN-/UPnP-Lautsprechern gewählt werden.
+- Die Audio-Ausgabe kann im Controller zwischen lokalem Raspberry-Pi-Audio, WLAN-/UPnP-Lautsprechern und Google-Cast-Lautsprechern gewählt werden.
 - Eigene Sender werden lokal in `data/config.json` gespeichert. Diese Datei wird nicht ins GitHub-Repository übernommen.
 - Nicht belastbar verifizierte Streams können aus der Senderliste entfernt werden; Standardsender werden dabei ausgeblendet und können wiederhergestellt werden.
 - Die Streamsuche findet direkte Audio-, M3U- und PLS-Links sowie bekannte Anbieterstrukturen. Webseiten, die Streams nur nach Login oder ausschließlich per dynamischer JavaScript/API-Logik ausliefern, können weniger Treffer liefern.
 - Der UPnP-Stream-Relay verbindet sich nach Upstream-Aussetzern automatisch neu; einstellbar über `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS` und `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
 - Der UPnP-Wiedergabe-Watchdog startet unerwartet gestoppte WLAN-Lautsprecher neu; einstellbar über `UPNP_PLAYBACK_WATCHDOG_ENABLED` und `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
+- Google-Cast-Geräte werden per mDNS erkannt; der Cast-Wiedergabe-Watchdog startet eine unterbrochene Cast-Wiedergabe automatisch neu. Bei Cast wird der Sender-Stream direkt an das Gerät übergeben (kein Pi-Relay).
+- Klang-/Equalizer-Einstellungen für Cast-Geräte erfolgen am Gerät bzw. in dessen App (Samsung Music Frame: SmartThings); Google Cast überträgt nur Lautstärke und Stummschaltung.
 - Die iTunes-Coversuche kann über `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE` und `ITUNES_COVER_QUALITY` angepasst werden.
 - Die iTunes-Covergröße ist standardmäßig auf `1000` Pixel gesetzt; geladene Cover werden nur über `/cover-proxy` ausgeliefert und nicht als Dateien in `data/` abgelegt.
 - Direktupdates im Controller sind nur in einer Git-Installation aktiv; ZIP- oder rsync-Installationen zeigen den Update-Status, starten aber kein Git-Update.

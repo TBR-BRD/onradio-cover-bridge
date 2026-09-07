@@ -5,10 +5,11 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-Webserver-009688?logo=fastapi&logoColor=white)
 ![Chromium](https://img.shields.io/badge/Chromium-Kiosk-4285F4?logo=googlechrome&logoColor=white)
 ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD)
+![Google Cast](https://img.shields.io/badge/Audio-Google%20Cast-4285F4?logo=googlecast&logoColor=white)
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
 ![Android](https://img.shields.io/badge/BBuzzCanvas-Android%205.1-3DDC84?logo=android&logoColor=white)
 
-Ein Raspberry-Pi-basiertes Radio- und Infodisplay mit **Mobile-Webcontroller**, **Albumcover**, **Titelinformationen**, **Uhrzeit**, **Wetter**, **QR-Code**, **Systemmonitoring** und **Audio-Ausgabe auf WLAN-/UPnP-Lautsprecher**.
+Ein Raspberry-Pi-basiertes Radio- und Infodisplay mit **Mobile-Webcontroller**, **Albumcover**, **Titelinformationen**, **Uhrzeit**, **Wetter**, **QR-Code**, **Systemmonitoring** und **Audio-Ausgabe auf WLAN-/UPnP- und Google-Cast-Lautsprecher** (z. B. Sonos, Denon oder Samsung Music Frame).
 
 Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokalen Raspberry-Pi-Display kann ein separates **BBuzzCanvas** als zusätzliches Fullscreen-Coverdisplay genutzt werden.
 
@@ -18,6 +19,7 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 - Albumcover, Titel, Interpret, Uhrzeit, Datum und Wetter auf dem Raspberry-Pi-Display
 - separates Fullscreen-Coverdisplay auf einem BBuzzCanvas
 - Ausgabe auf WLAN-/UPnP-Lautsprecher wie Sonos oder Denon
+- Ausgabe auf Google-Cast-Lautsprecher wie den Samsung Music Frame
 - Touch-Bedienung direkt auf dem Raspberry Pi
 - QR-Code für schnellen Zugriff auf den Webcontroller
 - CPU-, RAM-, Temperatur-, Load-, Throttling- und Uptime-Anzeige im Controller
@@ -74,6 +76,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 - Senderwechsel per Mobile-Controller
 - Senderwechsel zusätzlich direkt auf dem Raspberry-Pi-Display
 - Wiedergabe über WLAN-/UPnP-Lautsprecher
+- Wiedergabe über Google-Cast-Lautsprecher (z. B. Samsung Music Frame)
 - Stream-Relay über den Raspberry Pi für bessere Renderer-Kompatibilität
 
 ### Titelinformationen und Metadaten
@@ -168,6 +171,15 @@ http://<PI-IP>:8080/api/system
 - lokaler Stream-Relay über den Raspberry Pi
 - Anzeige des aktiven Lautsprechernamens auf dem Display
 - Audio-Ausgabe am Raspberry Pi selbst ist nicht erforderlich
+- UPnP-Wiedergabe-Watchdog startet einen unerwartet gestoppten Lautsprecher neu
+
+### Google-Cast-Lautsprecher
+
+- automatische Erkennung von Google-Cast-Geräten per mDNS (z. B. Samsung Music Frame)
+- Auswahl im Controller, Steuerung von Lautstärke, Stummschaltung und Start/Stop
+- der Cast-Lautsprecher zieht den aufgelösten Sender-Stream direkt aus dem Netz (kein Pi-Relay), damit Dauerstreams nicht nach kurzer Zeit abbrechen
+- Cast-Wiedergabe-Watchdog startet eine unterbrochene Wiedergabe automatisch neu
+- Klang-/Equalizer-Einstellungen erfolgen am Gerät bzw. in dessen App (Samsung Music Frame: SmartThings); Google Cast überträgt nur Lautstärke und Stummschaltung
 
 ### BBuzzCanvas Android-Kiosk
 
@@ -226,9 +238,10 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
             +-------------------+--------------------+
             |                   |                    |
             v                   v                    v
-     Raspberry Pi          BBuzzCanvas           WLAN / UPnP
+     Raspberry Pi          BBuzzCanvas           WLAN / UPnP / Cast
      7" Display            Android 5.1           Lautsprecher
-     /display              Kiosk-App             Sonos / Denon
+     /display              Kiosk-App             Sonos / Denon /
+                                                 Samsung Music Frame
                             /cover
                             /cover?rotate=left
                             /cover?rotate=left&overlay=1
@@ -242,7 +255,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 4. Das passende Albumcover wird aufgelöst und bei Bedarf über den lokalen Cover-Proxy bereitgestellt.
 5. Das Raspberry-Pi-Display ruft `/display` auf und zeigt die vollständige Informationsoberfläche.
 6. Das BBuzzCanvas ruft `/cover` auf und zeigt das aktuelle Cover. Optional blendet `overlay=1` Interpret und Titel dezent unten rechts ein.
-7. Der ausgewählte WLAN-/UPnP-Lautsprecher erhält den Radio-Stream über den Raspberry Pi.
+7. Der ausgewählte WLAN-/UPnP-Lautsprecher erhält den Radio-Stream über den Raspberry Pi; ein Google-Cast-Lautsprecher erhält die aufgelöste Stream-URL direkt.
 8. Der Controller ruft zusätzlich `/api/system` für die Systemzustandsanzeige ab.
 
 ## Wichtige URLs
@@ -265,7 +278,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 - offizielles Raspberry Pi 7-Zoll-Display
 - WLAN oder LAN im lokalen Netzwerk
 - Smartphone / iPhone für den Controller
-- UPnP-/DLNA-kompatibler WLAN-Lautsprecher
+- UPnP-/DLNA-kompatibler WLAN-Lautsprecher oder Google-Cast-Lautsprecher (z. B. Samsung Music Frame)
 - Python 3
 - Chromium im Kiosk-Modus
 - optional: BBuzzCanvas mit Android 5.1 und BBuzzCanvas Cover Kiosk App

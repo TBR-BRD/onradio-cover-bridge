@@ -5,9 +5,10 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-Webserver-009688?logo=fastapi&logoColor=white)
 ![Chromium](https://img.shields.io/badge/Chromium-Kiosk-4285F4?logo=googlechrome&logoColor=white)
 ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD)
+![Google Cast](https://img.shields.io/badge/Audio-Google%20Cast-4285F4?logo=googlecast&logoColor=white)
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
 
-A Raspberry Pi based **radio and information display** with a **mobile web controller**, **editable station list**, **web stream discovery**, **album artwork**, **clock**, **weather**, **QR code**, and **audio output to WLAN/UPnP speakers**.
+A Raspberry Pi based **radio and information display** with a **mobile web controller**, **editable station list**, **web stream discovery**, **album artwork**, **clock**, **weather**, **QR code**, and **audio output to WLAN/UPnP and Google Cast speakers** (e.g. Sonos, Denon or the Samsung Music Frame).
 
 The system is designed for a Raspberry Pi 3 with the official 7-inch display as a permanent kiosk display on a local home network.  
 Control is handled comfortably from an iPhone or any other smartphone on the same Wi-Fi network.
@@ -17,6 +18,7 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Internet radio control from a smartphone on the local network
 - Album artwork, track info, clock, and weather on the Raspberry Pi display
 - Audio output to WLAN/UPnP speakers such as Sonos or Denon
+- Audio output to Google Cast speakers such as the Samsung Music Frame
 - Touch controls directly on the Raspberry Pi
 - QR code for quick access to the web controller
 - Add, hide, remove, and restore stations directly in the controller
@@ -35,6 +37,7 @@ Control is handled comfortably from an iPhone or any other smartphone on the sam
 - Station switching from the controller
 - Station switching directly on the Raspberry Pi display
 - Playback through WLAN/UPnP speakers
+- Playback through Google Cast speakers (e.g. Samsung Music Frame)
 - Add custom stations with name, homepage, stream URL, and audio mode
 - Hide built-in stations and restore them when needed
 - Station list updates automatically after changes in the controller
@@ -92,6 +95,7 @@ Smartphone / iPhone
 | Cover Logic          |
 | Weather Service      |
 | UPnP Stream Relay    |
+| Google Cast control  |
 +----------------------+
         |            \
         |             \
@@ -107,7 +111,7 @@ Smartphone / iPhone
 - official Raspberry Pi display
 - local Wi-Fi network
 - smartphone / iPhone for the controller
-- WLAN/UPnP speaker
+- WLAN/UPnP speaker or Google Cast speaker (e.g. Samsung Music Frame)
 - Python 3
 - Chromium in kiosk mode
 
@@ -206,12 +210,14 @@ sudo reboot
 
 ## Notes
 
-- Audio output can be selected in the controller between local Raspberry Pi audio and WLAN/UPnP speakers.
+- Audio output can be selected in the controller between local Raspberry Pi audio, WLAN/UPnP speakers and Google Cast speakers.
 - Custom stations are stored locally in `data/config.json`. This file is not committed to the GitHub repository.
 - Streams that cannot be reliably verified can be removed from the station list; built-in stations are hidden and can be restored.
 - Stream discovery finds direct audio, M3U, and PLS links as well as known provider structures. Websites that expose streams only after login or exclusively through dynamic JavaScript/API logic may return fewer results.
 - The UPnP stream relay reconnects automatically after upstream stalls; tune it with `STREAM_RELAY_READ_TIMEOUT_SECONDS`, `STREAM_RELAY_RECONNECT_ATTEMPTS`, and `STREAM_RELAY_RECONNECT_DELAY_SECONDS`.
 - The UPnP playback watchdog restarts unexpectedly stopped WLAN speakers; tune it with `UPNP_PLAYBACK_WATCHDOG_ENABLED` and `UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`.
+- Google Cast devices are discovered via mDNS; the Cast playback watchdog automatically restarts an interrupted Cast stream. For Cast the station stream is handed directly to the device (no Pi relay).
+- Sound/equalizer settings for Cast devices are made on the device or in its app (Samsung Music Frame: SmartThings); Google Cast only carries volume and mute.
 - iTunes cover lookup can be configured with `ITUNES_COVER_ENABLED`, `ITUNES_COVER_COUNTRY`, `ITUNES_COVER_SIZE`, and `ITUNES_COVER_QUALITY`.
 - Controller-based direct updates are only active in a Git installation; ZIP or rsync installations show update status but do not start a Git update.
 - The diagnostics page runs automatic self-tests and shows notes for stream, metadata, weather, audio, UPnP, update installation, and Raspberry Pi system data.

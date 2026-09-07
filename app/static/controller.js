@@ -296,7 +296,7 @@ function renderAudioOutputs(outputs, selectedOutputId) {
   }
   audioOutputsEmpty.classList.add('hidden');
   for (const output of outputs) {
-    if (!['jack', 'upnp'].includes(output.kind)) {
+    if (!['jack', 'upnp', 'cast'].includes(output.kind)) {
       continue;
     }
     const button = document.createElement('button');
@@ -982,7 +982,7 @@ function renderBluetoothDevices(payload) {
       <div class="device-card-copy">
         <strong>${escapeHtml(device.friendly_name || device.name || 'WLAN-Lautsprecher')}</strong>
         <span>${escapeHtml(device.host || '-')}</span>
-        <small>${escapeHtml(factLine || 'UPnP MediaRenderer')}</small>
+        <small>${escapeHtml(factLine || (device.protocol || 'WLAN-Lautsprecher'))}</small>
       </div>
       <div class="device-card-actions"></div>
     `;

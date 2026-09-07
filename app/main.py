@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
 
 from .audio_resolver import AudioStreamResolver
 from .audio_system import AudioOutput, AudioState, AudioSystemService
+from .cast_renderer import CastRendererService
 from .config_manager import ConfigRepository, ControllerConfig
 from .cover_provider import PreferredCoverProvider
 from .display_schedule import DisplayScheduleService
@@ -130,6 +131,7 @@ class AppServices:
         self.audio_resolver = AudioStreamResolver()
         self.audio_service = AudioSystemService()
         self.upnp_service = UpnpRendererService()
+        self.cast_service = CastRendererService()
         self.weather_service = WeatherService()
         self.display_schedule = DisplayScheduleService()
         self.selftest_service = SelfTestService(
@@ -142,6 +144,7 @@ class AppServices:
         self.update_service = UpdateService(PROJECT_DIR)
         self.poll_task: asyncio.Task[None] | None = None
         self.last_upnp_watchdog_attempt_at = 0.0
+        self.last_cast_watchdog_attempt_at = 0.0
         self.relay_failure_station_id: str | None = None
         self.relay_failure_at = 0.0
         self.relay_failure_retuned_at = 0.0
@@ -236,7 +239,7 @@ class AppServices:
 
         await self.refresh_selected_station()
 
-        if was_upnp_playing or (config_copy.audio_output_id.startswith("upnp:") and should_resume_playback):
+        if was_upnp_playing or (audio_state.route_kind == "cast" and audio_state.transport_playing) or (config_copy.audio_output_id.startswith(("upnp:", "cast:")) and should_resume_playback):
             try:
                 await self.set_output_playback(True)
             except Exception as exc:  # noqa: BLE001
@@ -260,7 +263,9 @@ class AppServices:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
 
-        if config_copy.audio_output_id.startswith("upnp:"):
+        if config_copy.audio_output_id.startswith("cast:"):
+            await self.set_output_playback(playing)
+        elif config_copy.audio_output_id.startswith("upnp:"):
             await self._set_upnp_output_playback(config_copy, playing)
 
         async with self.state_lock:
@@ -398,7 +403,10 @@ class AppServices:
     async def set_audio_volume(self, percent: int) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        if config_copy.audio_output_id.startswith("upnp:"):
+        if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
+            if config_copy.audio_output_id.startswith("cast:"):
+                await asyncio.to_thread(self.cast_service.set_volume, config_copy.audio_output_id, percent)
+                return await self.get_audio_state()
             await asyncio.to_thread(self.upnp_service.set_volume, config_copy.audio_output_id, percent)
             return await self.get_audio_state()
         await asyncio.to_thread(self.audio_service.set_volume, percent)
@@ -407,7 +415,11 @@ class AppServices:
     async def change_audio_volume(self, delta: int) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        if config_copy.audio_output_id.startswith("upnp:"):
+        if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
+            if config_copy.audio_output_id.startswith("cast:"):
+                current = await asyncio.to_thread(self.cast_service.get_volume, config_copy.audio_output_id)
+                await asyncio.to_thread(self.cast_service.set_volume, config_copy.audio_output_id, max(0, min(100, current + int(delta))))
+                return await self.get_audio_state()
             current = await asyncio.to_thread(self._build_audio_state, config_copy)
             target = max(0, min(100, int(current.volume_percent) + int(delta)))
             await asyncio.to_thread(self.upnp_service.set_volume, config_copy.audio_output_id, target)
@@ -418,7 +430,10 @@ class AppServices:
     async def set_audio_muted(self, muted: bool) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        if config_copy.audio_output_id.startswith("upnp:"):
+        if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
+            if config_copy.audio_output_id.startswith("cast:"):
+                await asyncio.to_thread(self.cast_service.set_mute, config_copy.audio_output_id, muted)
+                return await self.get_audio_state()
             await asyncio.to_thread(self.upnp_service.set_mute, config_copy.audio_output_id, muted)
             return await self.get_audio_state()
         await asyncio.to_thread(self.audio_service.set_muted, muted)
@@ -427,7 +442,11 @@ class AppServices:
     async def toggle_audio_mute(self) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        if config_copy.audio_output_id.startswith("upnp:"):
+        if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
+            if config_copy.audio_output_id.startswith("cast:"):
+                current = await asyncio.to_thread(self._build_audio_state, config_copy)
+                await asyncio.to_thread(self.cast_service.set_mute, config_copy.audio_output_id, not current.muted)
+                return await self.get_audio_state()
             current = await asyncio.to_thread(self._build_audio_state, config_copy)
             await asyncio.to_thread(self.upnp_service.set_mute, config_copy.audio_output_id, not current.muted)
             return await self.get_audio_state()
@@ -438,7 +457,7 @@ class AppServices:
         output_id = str(output_id or "").strip() or "jack"
         async with self.config_lock:
             previous_output_id = self.config.audio_output_id
-        if not output_id.startswith("upnp:"):
+        if not output_id.startswith(("upnp:", "cast:")):
             await asyncio.to_thread(self.audio_service.set_output, output_id)
         async with self.config_lock:
             self.config.audio_output_id = output_id
@@ -450,6 +469,11 @@ class AppServices:
                 await asyncio.to_thread(self.upnp_service.stop, previous_output_id)
             except Exception:
                 pass
+        if previous_output_id.startswith("cast:") and previous_output_id != output_id:
+            try:
+                await asyncio.to_thread(self.cast_service.stop, previous_output_id)
+            except Exception:
+                pass
         return (await asyncio.to_thread(self._build_audio_state, config_copy, True)).to_public_dict()
 
     async def get_upnp_state(self) -> dict[str, Any]:
@@ -459,19 +483,37 @@ class AppServices:
 
     async def discover_upnp(self, seconds: int) -> dict[str, Any]:
         payload = await asyncio.to_thread(self.upnp_service.discover, seconds)
+        cast_payload = await asyncio.to_thread(self.cast_service.discover, seconds)
+        payload["renderers"] = (payload.get("renderers") or []) + (cast_payload.get("renderers") or [])
+        payload["message"] = f"{len(payload['renderers'])} WLAN-Lautsprecher gefunden" if payload["renderers"] else "Keine WLAN-Lautsprecher gefunden"
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        selected_id = config_copy.audio_output_id if config_copy.audio_output_id.startswith("upnp:") else None
+        selected_id = config_copy.audio_output_id if config_copy.audio_output_id.startswith(("upnp:", "cast:")) else None
         payload["selected_output_id"] = selected_id
         return payload
 
     async def set_output_playback(self, playing: bool) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        if not config_copy.audio_output_id.startswith("upnp:"):
+        if not config_copy.audio_output_id.startswith(("upnp:", "cast:")):
             return await self.get_audio_state()
 
-        await self._set_upnp_output_playback(config_copy, playing)
+        if config_copy.audio_output_id.startswith("cast:"):
+            if not playing:
+                await asyncio.to_thread(self.cast_service.stop, config_copy.audio_output_id)
+            else:
+                async with self.state_lock:
+                    current_title = self.state.title
+                    current_artist = self.state.artist
+                    station_id = self.state.selected_station_id
+                station = station_map(config_copy).get(station_id) or station_catalog(config_copy)[0]
+                try:
+                    cast_stream_url = await self.resolve_station_stream(station.id)
+                except Exception:  # noqa: BLE001
+                    cast_stream_url = _build_upnp_stream_url(station.id)
+                await asyncio.to_thread(self.cast_service.play_stream, config_copy.audio_output_id, cast_stream_url, title=current_title or station.name, artist=current_artist or "")
+        else:
+            await self._set_upnp_output_playback(config_copy, playing)
         async with self.state_lock:
             self.state.set_playing_hint(playing)
             self.repository.save(self.state)
@@ -605,7 +647,7 @@ class AppServices:
         return f"/cover-proxy?url={quote(url, safe='')}"
 
     def _ensure_configured_output_applied(self) -> None:
-        if self.config.audio_output_id.startswith("upnp:"):
+        if self.config.audio_output_id.startswith(("upnp:", "cast:")):
             return
         try:
             self.audio_service.set_output(self.config.audio_output_id)
@@ -615,6 +657,7 @@ class AppServices:
     def _build_audio_state(self, config: ControllerConfig, force_upnp_refresh: bool = False) -> AudioState:
         local_state = self.audio_service.get_state()
         upnp_outputs: list[AudioOutput] = []
+        cast_outputs: list[AudioOutput] = []
         selected_upnp_renderer = None
         upnp_error: str | None = None
 
@@ -640,7 +683,31 @@ class AppServices:
             if default:
                 selected_upnp_renderer = renderer
 
-        outputs = tuple(self._mark_local_defaults(local_outputs, config.audio_output_id) + upnp_outputs)
+        try:
+            cast_renderers = self.cast_service.list_renderers(force_refresh=force_upnp_refresh, timeout_seconds=4 if force_upnp_refresh else 2)
+        except Exception:
+            cast_renderers = []
+        selected_cast_renderer = None
+        for renderer in cast_renderers:
+            default = config.audio_output_id == renderer.id
+            cast_outputs.append(AudioOutput(id=renderer.id, label=renderer.friendly_name, kind="cast", default=default, raw_name=renderer.friendly_name, backend_ref=renderer.id))
+            if default:
+                selected_cast_renderer = renderer
+
+        outputs = tuple(self._mark_local_defaults(local_outputs, config.audio_output_id) + upnp_outputs + cast_outputs)
+
+        if config.audio_output_id.startswith("cast:"):
+            cast_volume = 0
+            cast_muted = False
+            cast_playing = False
+            if selected_cast_renderer is not None:
+                try:
+                    cast_volume = int(self.cast_service.get_volume(config.audio_output_id))
+                    cast_muted = bool(self.cast_service.get_mute(config.audio_output_id))
+                    cast_playing = self.cast_service.get_transport_state(config.audio_output_id) == "PLAYING"
+                except Exception:  # noqa: BLE001
+                    pass
+            return AudioState(available=selected_cast_renderer is not None, backend="cast", volume_percent=cast_volume, muted=cast_muted, outputs=outputs, selected_output_id=config.audio_output_id, selected_output_label=selected_cast_renderer.friendly_name if selected_cast_renderer else "Google Cast", message=None if selected_cast_renderer else "Ausgewähltes Cast-Gerät momentan nicht gefunden", route_kind="cast", supports_transport=selected_cast_renderer is not None, transport_playing=cast_playing)
 
         if config.audio_output_id.startswith("upnp:"):
             message = upnp_error
@@ -694,7 +761,10 @@ class AppServices:
 
     def _build_upnp_status(self, config: ControllerConfig) -> dict[str, Any]:
         payload = self.upnp_service.status()
-        payload["selected_output_id"] = config.audio_output_id if config.audio_output_id.startswith("upnp:") else None
+        cast_renderers = self.cast_service.list_renderers(force_refresh=False, timeout_seconds=2)
+        payload["renderers"] = (payload.get("renderers") or []) + [renderer.to_public_dict() for renderer in cast_renderers]
+        payload["message"] = f"{len(payload['renderers'])} WLAN-Lautsprecher gefunden" if payload["renderers"] else "Keine WLAN-Lautsprecher gefunden"
+        payload["selected_output_id"] = config.audio_output_id if config.audio_output_id.startswith(("upnp:", "cast:")) else None
         payload["selected_output_label"] = None
         selected = payload.get("selected_output_id")
         for renderer in payload.get("renderers") or []:
@@ -713,7 +783,7 @@ class AppServices:
 
     @staticmethod
     def _mark_local_defaults(outputs: list[AudioOutput], selected_output_id: str) -> list[AudioOutput]:
-        if selected_output_id.startswith("upnp:"):
+        if selected_output_id.startswith(("upnp:", "cast:")):
             return [
                 AudioOutput(
                     id=output.id,
@@ -756,6 +826,10 @@ class AppServices:
                 await self.ensure_upnp_playback()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("UPnP playback watchdog failed: %s", exc)
+            try:
+                await self.ensure_cast_playback()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Cast playback watchdog failed: %s", exc)
             await asyncio.sleep(settings.poll_interval_seconds)
 
     async def ensure_upnp_playback(self) -> None:
@@ -798,6 +872,32 @@ class AppServices:
                 station.id,
             )
         await self._set_upnp_output_playback(config_copy, True)
+
+    async def ensure_cast_playback(self) -> None:
+        async with self.state_lock:
+            should_play = self.state.playing_hint
+        if not should_play:
+            return
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+        if not config_copy.audio_output_id.startswith("cast:"):
+            return
+        now = time.monotonic()
+        cooldown = max(5, settings.upnp_playback_watchdog_cooldown_seconds)
+        if now - self.last_cast_watchdog_attempt_at < cooldown:
+            return
+        try:
+            state = await asyncio.to_thread(self.cast_service.get_transport_state, config_copy.audio_output_id)
+        except Exception:  # noqa: BLE001
+            state = "UNKNOWN"
+        if state == "PLAYING":
+            return
+        self.last_cast_watchdog_attempt_at = now
+        logger.warning("Cast-Watchdog startet Wiedergabe neu (Transport: %s)", state)
+        try:
+            await self.set_output_playback(True)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Cast-Watchdog-Neustart fehlgeschlagen: %s", exc)
 
     def note_upnp_relay_interruption(self, station_id: str) -> None:
         self.relay_failure_station_id = station_id

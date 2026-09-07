@@ -1,0 +1,27 @@
+{
+  "name": "onradio-cover-bridge",
+  "version": "1.0.0",
+  "description": "![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-3-C51A4A?logo=raspberrypi&logoColor=white) ![Python](https://img.shields.io/badge/Python-3-blue?logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-Webserver-009688?logo=fastapi&logoColor=white) ![Chromium](https://img.shields.io/badge/Chromium-Kiosk-4285F4?logo=googlechrome&logoColor=white) ![UPnP](https://img.shields.io/badge/Audio-UPnP%20%2F%20DLNA-6A5ACD) ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://TBR-BRD@github.com/TBR-BRD/onradio-cover-bridge.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/TBR-BRD/onradio-cover-bridge/issues"
+  },
+  "homepage": "https://github.com/TBR-BRD/onradio-cover-bridge#readme",
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}
