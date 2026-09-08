@@ -145,6 +145,7 @@ class AppServices:
         self.poll_task: asyncio.Task[None] | None = None
         self.last_upnp_watchdog_attempt_at = 0.0
         self.last_cast_watchdog_attempt_at = 0.0
+        self._cast_not_playing_since: float | None = None
         self.relay_failure_station_id: str | None = None
         self.relay_failure_at = 0.0
         self.relay_failure_retuned_at = 0.0
@@ -512,6 +513,10 @@ class AppServices:
                 except Exception:  # noqa: BLE001
                     cast_stream_url = _build_upnp_stream_url(station.id)
                 await asyncio.to_thread(self.cast_service.play_stream, config_copy.audio_output_id, cast_stream_url, title=current_title or station.name, artist=current_artist or "")
+            # Nach einem bewussten (Neu-)Start dem Geraet Zeit zum Einschwingen
+            # geben, bevor der Watchdog wieder eingreifen darf.
+            self.last_cast_watchdog_attempt_at = time.monotonic()
+            self._cast_not_playing_since = None
         else:
             await self._set_upnp_output_playback(config_copy, playing)
         async with self.state_lock:
@@ -877,22 +882,37 @@ class AppServices:
         async with self.state_lock:
             should_play = self.state.playing_hint
         if not should_play:
+            self._cast_not_playing_since = None
             return
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
         if not config_copy.audio_output_id.startswith("cast:"):
+            self._cast_not_playing_since = None
             return
         now = time.monotonic()
-        cooldown = max(5, settings.upnp_playback_watchdog_cooldown_seconds)
+        cooldown = max(10, settings.cast_playback_watchdog_cooldown_seconds)
         if now - self.last_cast_watchdog_attempt_at < cooldown:
             return
         try:
             state = await asyncio.to_thread(self.cast_service.get_transport_state, config_copy.audio_output_id)
         except Exception:  # noqa: BLE001
-            state = "UNKNOWN"
+            # Eine fehlgeschlagene Statusabfrage ist kein Grund, in eine
+            # laufende Wiedergabe einzugreifen.
+            return
         if state == "PLAYING":
+            self._cast_not_playing_since = None
+            return
+        # Entprellen: der Music Frame meldet nach Sender-/Titelwechseln und bei
+        # kurzen Netzhaengern fuer ein paar Sekunden UNKNOWN/IDLE und faengt
+        # sich von selbst wieder. Erst nach anhaltendem Stillstand neu starten,
+        # sonst erzeugt der Watchdog die Aussetzer, die er verhindern soll.
+        if self._cast_not_playing_since is None:
+            self._cast_not_playing_since = now
+            return
+        if now - self._cast_not_playing_since < max(10, settings.cast_playback_watchdog_min_down_seconds):
             return
         self.last_cast_watchdog_attempt_at = now
+        self._cast_not_playing_since = None
         logger.warning("Cast-Watchdog startet Wiedergabe neu (Transport: %s)", state)
         try:
             await self.set_output_playback(True)

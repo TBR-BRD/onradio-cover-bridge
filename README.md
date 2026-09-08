@@ -178,7 +178,7 @@ http://<PI-IP>:8080/api/system
 - automatische Erkennung von Google-Cast-Geräten per mDNS (z. B. Samsung Music Frame)
 - Auswahl im Controller, Steuerung von Lautstärke, Stummschaltung und Start/Stop
 - der Cast-Lautsprecher zieht den aufgelösten Sender-Stream direkt aus dem Netz (kein Pi-Relay), damit Dauerstreams nicht nach kurzer Zeit abbrechen
-- Cast-Wiedergabe-Watchdog startet eine unterbrochene Wiedergabe automatisch neu
+- Cast-Wiedergabe-Watchdog startet eine unterbrochene Wiedergabe automatisch neu, greift dabei aber erst nach anhaltendem Stillstand ein (`CAST_PLAYBACK_WATCHDOG_MIN_DOWN_SECONDS`, `CAST_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`), damit kurze Melde-Aussetzer des Music Frame nicht zu unnötigen Neustarts führen
 - Klang-/Equalizer-Einstellungen erfolgen am Gerät bzw. in dessen App (Samsung Music Frame: SmartThings); Google Cast überträgt nur Lautstärke und Stummschaltung
 
 ### BBuzzCanvas Android-Kiosk

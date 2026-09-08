@@ -39,6 +39,8 @@ class Settings:
     stream_relay_reconnect_delay_seconds: float = float(os.getenv("STREAM_RELAY_RECONNECT_DELAY_SECONDS", "0.5"))
     upnp_playback_watchdog_enabled: bool = _env_flag("UPNP_PLAYBACK_WATCHDOG_ENABLED", True)
     upnp_playback_watchdog_cooldown_seconds: int = int(os.getenv("UPNP_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS", "20"))
+    cast_playback_watchdog_cooldown_seconds: int = int(os.getenv("CAST_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS", "45"))
+    cast_playback_watchdog_min_down_seconds: int = int(os.getenv("CAST_PLAYBACK_WATCHDOG_MIN_DOWN_SECONDS", "45"))
     itunes_cover_enabled: bool = _env_flag("ITUNES_COVER_ENABLED", True)
     itunes_cover_country: str = os.getenv("ITUNES_COVER_COUNTRY", "DE").strip().upper() or "DE"
     itunes_cover_timeout_seconds: int = int(os.getenv("ITUNES_COVER_TIMEOUT_SECONDS", "8"))
