@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -56,6 +57,15 @@ class CastRendererService:
         self._chromecasts: dict[str, Any] = {}
         self._connected: set[str] = set()
         self._started_at = 0.0
+        # Feste IPs für die Cast-Discovery. Der Samsung Music Frame beantwortet
+        # mDNS-Info-Anfragen zeitweise mit einem SSL-EOF; pychromecast kann die
+        # Verbindung dann nach einem Abriss nicht per mDNS wieder aufbauen. Mit
+        # bekannten Hosts läuft der Reconnect direkt über die IP.
+        self._known_hosts: set[str] = {
+            h.strip()
+            for h in os.getenv("CAST_KNOWN_HOSTS", "").replace(";", ",").split(",")
+            if h.strip()
+        }
         self._start_browser()
 
     # -- interne Discovery -------------------------------------------------
@@ -66,9 +76,30 @@ class CastRendererService:
             if self._browser is not None:
                 return
             self._zconf = zeroconf.Zeroconf()
-            self._browser = CastBrowser(SimpleCastListener(), self._zconf)
+            self._browser = CastBrowser(
+                SimpleCastListener(),
+                self._zconf,
+                known_hosts=sorted(self._known_hosts) or None,
+            )
             self._browser.start_discovery()
             self._started_at = time.monotonic()
+
+    def _learn_host(self, host: str) -> None:
+        """Erfolgreich gesehene Geräte-IP dauerhaft der Discovery bekannt machen.
+
+        So kann pychromecast nach einem Verbindungsabriss direkt über die IP
+        reconnecten, auch wenn die mDNS-Antwort des Geräts gerade fehlschlägt.
+        """
+        host = (host or "").strip()
+        if not host or ":" in host or host in self._known_hosts:
+            return
+        self._known_hosts.add(host)
+        host_browser = getattr(self._browser, "host_browser", None)
+        if host_browser is not None:
+            try:
+                host_browser.add_hosts([host])
+            except Exception:  # pragma: no cover
+                pass
 
     def _devices(self) -> dict[Any, Any]:
         if self._browser is None:
@@ -110,6 +141,7 @@ class CastRendererService:
                 services = getattr(info, "services", None)
                 if services:
                     host = str(next(iter(services)))
+            self._learn_host(host)
             renderers.append(
                 CastRenderer(
                     id=f"cast:{uuid_str}",
@@ -173,6 +205,35 @@ class CastRendererService:
                 cast.wait(timeout=10)
                 self._connected.add(renderer_id)
         return cast
+
+    def reset_device(self, renderer_id: str) -> None:
+        """Verbindung zu einem Gerät komplett verwerfen.
+
+        Nächster ``get_renderer`` baut ein frisches ``Chromecast``-Objekt. Für
+        den Fall, dass pychromecast in einer Reconnect-Schleife feststeckt und
+        sich nicht mehr von selbst fängt.
+        """
+        self._forget(renderer_id)
+
+    def reset(self) -> None:
+        """Die gesamte Cast-Discovery neu aufsetzen (Notausstieg)."""
+        with self._lock:
+            for renderer_id in list(self._chromecasts):
+                self._forget(renderer_id)
+            browser, zconf = self._browser, self._zconf
+            self._browser = None
+            self._zconf = None
+        if browser is not None:
+            try:
+                browser.stop_discovery()
+            except Exception:  # pragma: no cover
+                pass
+        if zconf is not None:
+            try:
+                zconf.close()
+            except Exception:  # pragma: no cover
+                pass
+        self._start_browser()
 
     def _forget(self, renderer_id: str) -> None:
         with self._lock:

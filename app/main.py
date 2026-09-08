@@ -146,6 +146,7 @@ class AppServices:
         self.last_upnp_watchdog_attempt_at = 0.0
         self.last_cast_watchdog_attempt_at = 0.0
         self._cast_not_playing_since: float | None = None
+        self._cast_watchdog_failures = 0
         self.relay_failure_station_id: str | None = None
         self.relay_failure_at = 0.0
         self.relay_failure_retuned_at = 0.0
@@ -913,11 +914,55 @@ class AppServices:
             return
         self.last_cast_watchdog_attempt_at = now
         self._cast_not_playing_since = None
+
+        # Nach wiederholten Fehlversuchen die (evtl. in einer Reconnect-Schleife
+        # feststeckende) pychromecast-Verbindung stufenweise hart zuruecksetzen.
+        cast_id = config_copy.audio_output_id
+        if self._cast_watchdog_failures >= 4:
+            logger.warning("Cast-Watchdog: Discovery wird komplett neu aufgesetzt")
+            try:
+                await asyncio.to_thread(self.cast_service.reset)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Cast-Discovery-Reset fehlgeschlagen: %s", exc)
+        elif self._cast_watchdog_failures >= 2:
+            logger.warning("Cast-Watchdog: Geräteverbindung wird verworfen")
+            try:
+                await asyncio.to_thread(self.cast_service.reset_device, cast_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Cast-Geräte-Reset fehlgeschlagen: %s", exc)
+
         logger.warning("Cast-Watchdog startet Wiedergabe neu (Transport: %s)", state)
+        cooldown = max(10, settings.cast_playback_watchdog_cooldown_seconds)
         try:
             await self.set_output_playback(True)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Cast-Watchdog-Neustart fehlgeschlagen: %s", exc)
+            self._cast_watchdog_failures += 1
+            logger.warning(
+                "Cast-Watchdog-Neustart fehlgeschlagen (%s. Versuch): %s",
+                self._cast_watchdog_failures,
+                exc,
+            )
+            self.last_cast_watchdog_attempt_at = now - cooldown + 12
+            return
+
+        # Erfolg nur zählen, wenn danach wirklich abgespielt wird.
+        await asyncio.sleep(3)
+        try:
+            new_state = await asyncio.to_thread(
+                self.cast_service.get_transport_state, cast_id
+            )
+        except Exception:  # noqa: BLE001
+            new_state = "UNKNOWN"
+        if new_state == "PLAYING":
+            self._cast_watchdog_failures = 0
+        else:
+            self._cast_watchdog_failures += 1
+            logger.warning(
+                "Cast-Watchdog: Wiedergabe nach Neustart weiter %s (%s. Versuch)",
+                new_state,
+                self._cast_watchdog_failures,
+            )
+            self.last_cast_watchdog_attempt_at = now - cooldown + 12
 
     def note_upnp_relay_interruption(self, station_id: str) -> None:
         self.relay_failure_station_id = station_id
