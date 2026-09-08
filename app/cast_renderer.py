@@ -312,11 +312,17 @@ class CastRendererService:
                     pass
                 time.sleep(1.0)
 
+            # BUFFERED gibt dem Music Frame einen groesseren Puffer und damit
+            # ruhigere Wiedergabe bei WLAN-Jitter. LIVE nur, wenn ausdruecklich
+            # gewuenscht (kleinerer Puffer, geringere Latenz).
+            stream_type = os.getenv("CAST_STREAM_TYPE", "BUFFERED").strip().upper()
+            if stream_type not in {"BUFFERED", "LIVE"}:
+                stream_type = "BUFFERED"
             media_controller.play_media(
                 stream_url,
                 "audio/mpeg",
                 title=f"{title} - {artist}" if artist else title,
-                stream_type="LIVE",
+                stream_type=stream_type,
                 autoplay=True,
             )
             try:
