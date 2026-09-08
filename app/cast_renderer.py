@@ -40,6 +40,13 @@ class CastRendererService:
     anschließendem ``stop_discovery`` führt deshalb beim späteren ``wait()`` zu
     ``AssertionError: Zeroconf instance loop must be running``. Wir halten den
     Browser darum für die gesamte Prozesslaufzeit offen.
+
+    pychromecast ist **nicht** thread-sicher: der interne socket_client-Thread
+    liest den SSL-Socket, und gleichzeitige Schreibzugriffe aus mehreren
+    ``asyncio.to_thread``-Workern (Watchdog-Poll, Play, Lautstärke …) führen zu
+    ``SSLV3_ALERT_BAD_RECORD_MAC`` und einem Verbindungsabriss. Deshalb wird
+    **jede** Geräteoperation über ``self._lock`` serialisiert, und der Status
+    wird passiv aus ``media_controller.status`` gelesen statt aktiv gepollt.
     """
 
     def __init__(self) -> None:
@@ -74,6 +81,15 @@ class CastRendererService:
             if self._devices():
                 return
             time.sleep(0.25)
+
+    @staticmethod
+    def _is_connected(cast: Any) -> bool:
+        sc = getattr(cast, "socket_client", None)
+        if sc is None:
+            return False
+        # is_connected kann während eines Reconnects kurz False sein; das ist
+        # ok, wir behandeln nur den dauerhaft toten Fall separat.
+        return bool(getattr(sc, "is_connected", False))
 
     # -- öffentliche API ------------------------------------------------------
     def list_renderers(self, *, force_refresh: bool = False, timeout_seconds: int = 4) -> list[CastRenderer]:
@@ -122,6 +138,20 @@ class CastRendererService:
 
         with self._lock:
             cast = self._chromecasts.get(renderer_id)
+
+            # Dauerhaft tote Verbindung (socket_client-Thread gestoppt) wegwerfen
+            # und neu aufbauen.
+            if cast is not None:
+                sc = getattr(cast, "socket_client", None)
+                if sc is not None and getattr(sc, "is_stopped", False):
+                    try:
+                        cast.disconnect(blocking=False)
+                    except Exception:  # pragma: no cover
+                        pass
+                    self._chromecasts.pop(renderer_id, None)
+                    self._connected.discard(renderer_id)
+                    cast = None
+
             if cast is None:
                 info = None
                 for uuid, candidate in self._devices().items():
@@ -155,74 +185,104 @@ class CastRendererService:
                 pass
 
     def set_volume(self, renderer_id: str, percent: int) -> int:
-        cast = self.get_renderer(renderer_id)
-        value = max(0, min(100, int(percent))) / 100
-        cast.set_volume(value)
-        return int(round(float(cast.status.volume_level or value) * 100))
+        with self._lock:
+            cast = self.get_renderer(renderer_id)
+            value = max(0, min(100, int(percent))) / 100
+            cast.set_volume(value)
+            return int(round(float(cast.status.volume_level or value) * 100))
 
     def get_volume(self, renderer_id: str) -> int:
-        cast = self.get_renderer(renderer_id)
-        return int(round(float(cast.status.volume_level or 0) * 100))
-
-    def _refresh_media_status(self, cast: Any) -> None:
+        with self._lock:
+            cast = self._chromecasts.get(renderer_id)
+        if cast is None:
+            return 0
         try:
-            cast.media_controller.update_status()
+            return int(round(float(cast.status.volume_level or 0) * 100))
         except Exception:  # noqa: BLE001
-            pass
+            return 0
 
     def set_mute(self, renderer_id: str, muted: bool) -> bool:
-        cast = self.get_renderer(renderer_id)
-        cast.set_volume_muted(bool(muted))
-        return bool(cast.status.volume_muted)
+        with self._lock:
+            cast = self.get_renderer(renderer_id)
+            cast.set_volume_muted(bool(muted))
+            return bool(cast.status.volume_muted)
 
     def get_mute(self, renderer_id: str) -> bool:
-        cast = self.get_renderer(renderer_id)
-        return bool(cast.status.volume_muted)
+        with self._lock:
+            cast = self._chromecasts.get(renderer_id)
+        if cast is None:
+            return False
+        try:
+            return bool(cast.status.volume_muted)
+        except Exception:  # noqa: BLE001
+            return False
 
     def get_transport_state(self, renderer_id: str) -> str:
-        cast = self.get_renderer(renderer_id)
-        self._refresh_media_status(cast)
-        state = str(cast.media_controller.status.player_state or "IDLE").upper()
+        """Passiver Status - kein aktiver Poll auf den Socket.
+
+        Der socket_client-Thread hält ``media_controller.status`` aktuell,
+        solange die Verbindung steht. Nur bei tot gemeldeter Verbindung geben
+        wir ``UNKNOWN`` zurück; ein aktives ``update_status()`` aus diesem
+        Thread würde mit dem Lese-Thread kollidieren.
+        """
+        with self._lock:
+            cast = self._chromecasts.get(renderer_id)
+        if cast is None:
+            return "UNKNOWN"
+        sc = getattr(cast, "socket_client", None)
+        if sc is not None and getattr(sc, "is_stopped", False):
+            return "UNKNOWN"
+        try:
+            state = str(cast.media_controller.status.player_state or "IDLE").upper()
+        except Exception:  # noqa: BLE001
+            return "UNKNOWN"
         return "PLAYING" if state == "PLAYING" else state
 
     def play_stream(self, renderer_id: str, stream_url: str, *, title: str = "Radio Stream", artist: str = "") -> None:
-        cast = self.get_renderer(renderer_id)
-        media_controller = cast.media_controller
-        try:
-            media_controller.update_status()
-            if str(media_controller.status.player_state or "").upper() in {"PLAYING", "BUFFERING", "PAUSED"}:
-                media_controller.stop()
-                time.sleep(1.0)
-        except Exception:  # noqa: BLE001
-            pass
-        # Der Default Media Receiver des Samsung Music Frame lädt chunked-Streams
-        # ohne Content-Length nur zuverlässig als BUFFERED; "LIVE" bleibt hier
-        # gelegentlich im Zustand UNKNOWN hängen.
-        media_controller.play_media(
-            stream_url,
-            "audio/mpeg",
-            title=f"{title} - {artist}" if artist else title,
-            stream_type="LIVE",
-            autoplay=True,
-        )
-        media_controller.block_until_active(timeout=15)
-        deadline = time.monotonic() + 12
-        # autoplay=True startet bereits; hier nur bestaetigen bzw. sanft nachhelfen.
-        while time.monotonic() < deadline:
-            try:
-                media_controller.update_status()
-            except Exception:  # noqa: BLE001
-                pass
-            state = str(media_controller.status.player_state or "").upper()
-            if state == "PLAYING":
-                return
-            if state in {"PAUSED", "IDLE"}:
+        with self._lock:
+            cast = self.get_renderer(renderer_id)
+            media_controller = cast.media_controller
+
+            current = str(getattr(media_controller.status, "player_state", "") or "").upper()
+            if current in {"PLAYING", "BUFFERING", "PAUSED"}:
                 try:
-                    media_controller.play()
+                    media_controller.stop()
                 except Exception:  # noqa: BLE001
                     pass
-            time.sleep(1.5)
+                time.sleep(1.0)
+
+            media_controller.play_media(
+                stream_url,
+                "audio/mpeg",
+                title=f"{title} - {artist}" if artist else title,
+                stream_type="LIVE",
+                autoplay=True,
+            )
+            try:
+                media_controller.block_until_active(timeout=15)
+            except Exception:  # noqa: BLE001
+                pass
+
+            # autoplay=True startet bereits; hier nur passiv bestätigen und
+            # einmalig sanft nachhelfen, ohne den Socket zu pollen.
+            deadline = time.monotonic() + 10
+            nudged = False
+            while time.monotonic() < deadline:
+                state = str(getattr(media_controller.status, "player_state", "") or "").upper()
+                if state == "PLAYING":
+                    return
+                if state in {"PAUSED", "IDLE"} and not nudged:
+                    nudged = True
+                    try:
+                        media_controller.play()
+                    except Exception:  # noqa: BLE001
+                        pass
+                time.sleep(1.0)
 
     def stop(self, renderer_id: str) -> None:
-        cast = self.get_renderer(renderer_id)
-        cast.media_controller.stop()
+        with self._lock:
+            cast = self.get_renderer(renderer_id)
+            try:
+                cast.media_controller.stop()
+            except Exception:  # noqa: BLE001
+                pass
