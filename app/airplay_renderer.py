@@ -236,12 +236,35 @@ class AirPlayRendererService:
             await asyncio.sleep(0.5)
 
     async def _run_stream(self, atv: Any, url: str, metadata: Any) -> None:
-        try:
-            await atv.stream.stream_file(url, metadata=metadata)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("AirPlay-Stream beendet: %s", exc)
+        """Hält den RAOP-Stream am Leben.
+
+        ``stream_file`` kehrt zurück, sobald der HTTP-Quellstream kurz stockt
+        (Relay verbindet upstream neu). Wir starten sofort neu, damit der Ton
+        durchläuft. Erst bei mehreren Sofort-Fehlern in Folge geben wir auf und
+        überlassen die Wiederherstellung dem Watchdog.
+        """
+        quick_failures = 0
+        while True:
+            started = time.monotonic()
+            try:
+                await atv.stream.stream_file(url, metadata=metadata)
+                reason = "regulär beendet"
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                reason = f"Fehler: {exc}"
+            ran = time.monotonic() - started
+            if ran < 6.0:
+                quick_failures += 1
+                if quick_failures >= 4:
+                    logger.warning(
+                        "AirPlay-Stream bricht sofort ab (%s) - Watchdog übernimmt", reason
+                    )
+                    return
+            else:
+                quick_failures = 0
+            logger.info("AirPlay-Stream nach %.0fs neu gestartet (%s)", ran, reason)
+            await asyncio.sleep(1.0)
 
     async def stop(self, renderer_id: str) -> None:
         async with self._lock:
