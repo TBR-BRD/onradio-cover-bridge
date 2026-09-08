@@ -272,7 +272,7 @@ function getLocalStreamUrl(nextState = state) {
 }
 
 function isUpnpRoute(audio = state?.local_audio) {
-  return Boolean(audio && ['upnp', 'cast'].includes(audio.route_kind) && audio.supports_transport);
+  return Boolean(audio && ['upnp', 'cast', 'airplay'].includes(audio.route_kind) && audio.supports_transport);
 }
 
 function isUpnpTransportPlaying(audio = state?.local_audio) {

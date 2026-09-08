@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover
 
 from .audio_resolver import AudioStreamResolver
 from .audio_system import AudioOutput, AudioState, AudioSystemService
+from .airplay_renderer import AirPlayRendererService
 from .cast_renderer import CastRendererService
 from .config_manager import ConfigRepository, ControllerConfig
 from .cover_provider import PreferredCoverProvider
@@ -132,6 +133,7 @@ class AppServices:
         self.audio_service = AudioSystemService()
         self.upnp_service = UpnpRendererService()
         self.cast_service = CastRendererService()
+        self.airplay_service = AirPlayRendererService()
         self.weather_service = WeatherService()
         self.display_schedule = DisplayScheduleService()
         self.selftest_service = SelfTestService(
@@ -147,6 +149,8 @@ class AppServices:
         self.last_cast_watchdog_attempt_at = 0.0
         self._cast_not_playing_since: float | None = None
         self._cast_watchdog_failures = 0
+        self.last_airplay_watchdog_attempt_at = 0.0
+        self._airplay_not_playing_since: float | None = None
         self.relay_failure_station_id: str | None = None
         self.relay_failure_at = 0.0
         self.relay_failure_retuned_at = 0.0
@@ -154,6 +158,13 @@ class AppServices:
 
     async def start(self) -> None:
         await asyncio.to_thread(self._ensure_configured_output_applied)
+        # AirPlay-Discovery beim Start anstoßen, damit ein konfiguriertes
+        # AirPlay-Ziel nach einem Neustart schnell wieder bespielt wird.
+        if self.config.audio_output_id.startswith("airplay:"):
+            try:
+                await self.airplay_service.list_renderers(force_refresh=True)
+            except Exception:  # noqa: BLE001
+                pass
         self.poll_task = asyncio.create_task(self._poll_loop(), name="playlist-poll-loop")
         await self.refresh_selected_station()
 
@@ -241,7 +252,7 @@ class AppServices:
 
         await self.refresh_selected_station()
 
-        if was_upnp_playing or (audio_state.route_kind == "cast" and audio_state.transport_playing) or (config_copy.audio_output_id.startswith(("upnp:", "cast:")) and should_resume_playback):
+        if was_upnp_playing or (audio_state.route_kind in ("cast", "airplay") and audio_state.transport_playing) or (config_copy.audio_output_id.startswith(("upnp:", "cast:", "airplay:")) and should_resume_playback):
             try:
                 await self.set_output_playback(True)
             except Exception as exc:  # noqa: BLE001
@@ -265,7 +276,7 @@ class AppServices:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
 
-        if config_copy.audio_output_id.startswith("cast:"):
+        if config_copy.audio_output_id.startswith(("cast:", "airplay:")):
             await self.set_output_playback(playing)
         elif config_copy.audio_output_id.startswith("upnp:"):
             await self._set_upnp_output_playback(config_copy, playing)
@@ -405,6 +416,9 @@ class AppServices:
     async def set_audio_volume(self, percent: int) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
+        if config_copy.audio_output_id.startswith("airplay:"):
+            await self.airplay_service.set_volume(config_copy.audio_output_id, percent)
+            return await self.get_audio_state()
         if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
             if config_copy.audio_output_id.startswith("cast:"):
                 await asyncio.to_thread(self.cast_service.set_volume, config_copy.audio_output_id, percent)
@@ -417,6 +431,12 @@ class AppServices:
     async def change_audio_volume(self, delta: int) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
+        if config_copy.audio_output_id.startswith("airplay:"):
+            current = self.airplay_service.get_volume(config_copy.audio_output_id)
+            await self.airplay_service.set_volume(
+                config_copy.audio_output_id, max(0, min(100, current + int(delta)))
+            )
+            return await self.get_audio_state()
         if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
             if config_copy.audio_output_id.startswith("cast:"):
                 current = await asyncio.to_thread(self.cast_service.get_volume, config_copy.audio_output_id)
@@ -432,6 +452,9 @@ class AppServices:
     async def set_audio_muted(self, muted: bool) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
+        if config_copy.audio_output_id.startswith("airplay:"):
+            await self.airplay_service.set_mute(config_copy.audio_output_id, muted)
+            return await self.get_audio_state()
         if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
             if config_copy.audio_output_id.startswith("cast:"):
                 await asyncio.to_thread(self.cast_service.set_mute, config_copy.audio_output_id, muted)
@@ -444,6 +467,12 @@ class AppServices:
     async def toggle_audio_mute(self) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
+        if config_copy.audio_output_id.startswith("airplay:"):
+            await self.airplay_service.set_mute(
+                config_copy.audio_output_id,
+                not self.airplay_service.get_mute(config_copy.audio_output_id),
+            )
+            return await self.get_audio_state()
         if config_copy.audio_output_id.startswith(("upnp:", "cast:")):
             if config_copy.audio_output_id.startswith("cast:"):
                 current = await asyncio.to_thread(self._build_audio_state, config_copy)
@@ -459,7 +488,7 @@ class AppServices:
         output_id = str(output_id or "").strip() or "jack"
         async with self.config_lock:
             previous_output_id = self.config.audio_output_id
-        if not output_id.startswith(("upnp:", "cast:")):
+        if not output_id.startswith(("upnp:", "cast:", "airplay:")):
             await asyncio.to_thread(self.audio_service.set_output, output_id)
         async with self.config_lock:
             self.config.audio_output_id = output_id
@@ -476,6 +505,11 @@ class AppServices:
                 await asyncio.to_thread(self.cast_service.stop, previous_output_id)
             except Exception:
                 pass
+        if previous_output_id.startswith("airplay:") and previous_output_id != output_id:
+            try:
+                await self.airplay_service.stop(previous_output_id)
+            except Exception:
+                pass
         return (await asyncio.to_thread(self._build_audio_state, config_copy, True)).to_public_dict()
 
     async def get_upnp_state(self) -> dict[str, Any]:
@@ -486,21 +520,46 @@ class AppServices:
     async def discover_upnp(self, seconds: int) -> dict[str, Any]:
         payload = await asyncio.to_thread(self.upnp_service.discover, seconds)
         cast_payload = await asyncio.to_thread(self.cast_service.discover, seconds)
-        payload["renderers"] = (payload.get("renderers") or []) + (cast_payload.get("renderers") or [])
+        airplay_payload = await self.airplay_service.discover(seconds)
+        payload["renderers"] = (
+            (payload.get("renderers") or [])
+            + (cast_payload.get("renderers") or [])
+            + (airplay_payload.get("renderers") or [])
+        )
         payload["message"] = f"{len(payload['renderers'])} WLAN-Lautsprecher gefunden" if payload["renderers"] else "Keine WLAN-Lautsprecher gefunden"
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        selected_id = config_copy.audio_output_id if config_copy.audio_output_id.startswith(("upnp:", "cast:")) else None
+        selected_id = config_copy.audio_output_id if config_copy.audio_output_id.startswith(("upnp:", "cast:", "airplay:")) else None
         payload["selected_output_id"] = selected_id
         return payload
 
     async def set_output_playback(self, playing: bool) -> dict[str, Any]:
         async with self.config_lock:
             config_copy = ControllerConfig(**self.config.to_public_dict())
-        if not config_copy.audio_output_id.startswith(("upnp:", "cast:")):
+        if not config_copy.audio_output_id.startswith(("upnp:", "cast:", "airplay:")):
             return await self.get_audio_state()
 
-        if config_copy.audio_output_id.startswith("cast:"):
+        if config_copy.audio_output_id.startswith("airplay:"):
+            if not playing:
+                await self.airplay_service.stop(config_copy.audio_output_id)
+            else:
+                async with self.state_lock:
+                    current_title = self.state.title
+                    current_artist = self.state.artist
+                    station_id = self.state.selected_station_id
+                station = station_map(config_copy).get(station_id) or station_catalog(config_copy)[0]
+                # pyatv braucht eine stabile Quelle: den lokalen Relay des
+                # Servers, nicht die endlose Icecast-URL direkt.
+                relay_url = _build_upnp_stream_url(station.id)
+                await self.airplay_service.play_stream(
+                    config_copy.audio_output_id,
+                    relay_url,
+                    title=current_title or station.name,
+                    artist=current_artist or "",
+                )
+            self.last_airplay_watchdog_attempt_at = time.monotonic()
+            self._airplay_not_playing_since = None
+        elif config_copy.audio_output_id.startswith("cast:"):
             if not playing:
                 await asyncio.to_thread(self.cast_service.stop, config_copy.audio_output_id)
             else:
@@ -653,7 +712,7 @@ class AppServices:
         return f"/cover-proxy?url={quote(url, safe='')}"
 
     def _ensure_configured_output_applied(self) -> None:
-        if self.config.audio_output_id.startswith(("upnp:", "cast:")):
+        if self.config.audio_output_id.startswith(("upnp:", "cast:", "airplay:")):
             return
         try:
             self.audio_service.set_output(self.config.audio_output_id)
@@ -700,7 +759,42 @@ class AppServices:
             if default:
                 selected_cast_renderer = renderer
 
-        outputs = tuple(self._mark_local_defaults(local_outputs, config.audio_output_id) + upnp_outputs + cast_outputs)
+        airplay_outputs: list[AudioOutput] = []
+        selected_airplay_renderer = None
+        for renderer in self.airplay_service.cached_renderers():
+            default = config.audio_output_id == renderer.id
+            airplay_outputs.append(AudioOutput(id=renderer.id, label=renderer.friendly_name, kind="airplay", default=default, raw_name=renderer.friendly_name, backend_ref=renderer.id))
+            if default:
+                selected_airplay_renderer = renderer
+
+        outputs = tuple(self._mark_local_defaults(local_outputs, config.audio_output_id) + upnp_outputs + cast_outputs + airplay_outputs)
+
+        if config.audio_output_id.startswith("airplay:"):
+            ap_volume = 0
+            ap_muted = False
+            ap_playing = False
+            try:
+                ap_volume = int(self.airplay_service.get_volume(config.audio_output_id))
+                ap_muted = bool(self.airplay_service.get_mute(config.audio_output_id))
+                ap_playing = self.airplay_service.get_transport_state(config.audio_output_id) == "PLAYING"
+            except Exception:  # noqa: BLE001
+                pass
+            label = selected_airplay_renderer.friendly_name if selected_airplay_renderer else next(
+                (item.label for item in outputs if item.id == config.audio_output_id), "AirPlay"
+            )
+            return AudioState(
+                available=True,
+                backend="airplay",
+                volume_percent=ap_volume,
+                muted=ap_muted,
+                outputs=outputs,
+                selected_output_id=config.audio_output_id,
+                selected_output_label=label,
+                message=None if selected_airplay_renderer else "AirPlay-Gerät momentan nicht in der Liste - Wiedergabe wird beim Start gesucht",
+                route_kind="airplay",
+                supports_transport=True,
+                transport_playing=ap_playing,
+            )
 
         if config.audio_output_id.startswith("cast:"):
             cast_volume = 0
@@ -768,9 +862,14 @@ class AppServices:
     def _build_upnp_status(self, config: ControllerConfig) -> dict[str, Any]:
         payload = self.upnp_service.status()
         cast_renderers = self.cast_service.list_renderers(force_refresh=False, timeout_seconds=2)
-        payload["renderers"] = (payload.get("renderers") or []) + [renderer.to_public_dict() for renderer in cast_renderers]
+        airplay_renderers = self.airplay_service.cached_renderers()
+        payload["renderers"] = (
+            (payload.get("renderers") or [])
+            + [renderer.to_public_dict() for renderer in cast_renderers]
+            + [renderer.to_public_dict() for renderer in airplay_renderers]
+        )
         payload["message"] = f"{len(payload['renderers'])} WLAN-Lautsprecher gefunden" if payload["renderers"] else "Keine WLAN-Lautsprecher gefunden"
-        payload["selected_output_id"] = config.audio_output_id if config.audio_output_id.startswith(("upnp:", "cast:")) else None
+        payload["selected_output_id"] = config.audio_output_id if config.audio_output_id.startswith(("upnp:", "cast:", "airplay:")) else None
         payload["selected_output_label"] = None
         selected = payload.get("selected_output_id")
         for renderer in payload.get("renderers") or []:
@@ -789,7 +888,7 @@ class AppServices:
 
     @staticmethod
     def _mark_local_defaults(outputs: list[AudioOutput], selected_output_id: str) -> list[AudioOutput]:
-        if selected_output_id.startswith(("upnp:", "cast:")):
+        if selected_output_id.startswith(("upnp:", "cast:", "airplay:")):
             return [
                 AudioOutput(
                     id=output.id,
@@ -836,6 +935,10 @@ class AppServices:
                 await self.ensure_cast_playback()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Cast playback watchdog failed: %s", exc)
+            try:
+                await self.ensure_airplay_playback()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("AirPlay playback watchdog failed: %s", exc)
             await asyncio.sleep(settings.poll_interval_seconds)
 
     async def ensure_upnp_playback(self) -> None:
@@ -963,6 +1066,55 @@ class AppServices:
                 self._cast_watchdog_failures,
             )
             self.last_cast_watchdog_attempt_at = now - cooldown + 12
+
+    async def ensure_airplay_playback(self) -> None:
+        async with self.state_lock:
+            should_play = self.state.playing_hint
+        async with self.config_lock:
+            config_copy = ControllerConfig(**self.config.to_public_dict())
+
+        is_airplay = config_copy.audio_output_id.startswith("airplay:")
+        if not should_play or not is_airplay:
+            self._airplay_not_playing_since = None
+            return
+
+        # Discovery nur anstoßen, wenn das Zielgerät noch nicht bekannt ist
+        # (mDNS ist beim Music Frame flakey). list_renderers cached selbst.
+        known = any(
+            r.id == config_copy.audio_output_id
+            for r in self.airplay_service.cached_renderers()
+        )
+        if not known:
+            try:
+                await self.airplay_service.list_renderers(force_refresh=True)
+            except Exception:  # noqa: BLE001
+                pass
+
+        now = time.monotonic()
+        cooldown = max(10, settings.cast_playback_watchdog_cooldown_seconds)
+        if now - self.last_airplay_watchdog_attempt_at < cooldown:
+            return
+
+        state = self.airplay_service.get_transport_state(config_copy.audio_output_id)
+        if state == "PLAYING":
+            self._airplay_not_playing_since = None
+            return
+        if self._airplay_not_playing_since is None:
+            self._airplay_not_playing_since = now
+            return
+        # AirPlay-Transport ist eindeutig (Stream-Task läuft / läuft nicht),
+        # keine transienten UNKNOWN-Meldungen wie bei Cast -> kurzes Entprellen.
+        if now - self._airplay_not_playing_since < 15:
+            return
+
+        self.last_airplay_watchdog_attempt_at = now
+        self._airplay_not_playing_since = None
+        logger.warning("AirPlay-Watchdog startet Wiedergabe neu (Transport: %s)", state)
+        try:
+            await self.set_output_playback(True)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("AirPlay-Watchdog-Neustart fehlgeschlagen: %s", exc)
+            self.last_airplay_watchdog_attempt_at = now - cooldown + 12
 
     def note_upnp_relay_interruption(self, station_id: str) -> None:
         self.relay_failure_station_id = station_id

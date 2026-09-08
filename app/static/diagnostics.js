@@ -89,7 +89,7 @@ function renderSummaryCards(payload) {
     {
       label: 'Audio',
       value: audio.selected_output_label || 'Unbekannt',
-      detail: ['upnp', 'cast'].includes(audio.route_kind) ? 'WLAN-Lautsprecher' : 'Lokal am Raspberry Pi',
+      detail: ['upnp', 'cast', 'airplay'].includes(audio.route_kind) ? 'WLAN-Lautsprecher' : 'Lokal am Raspberry Pi',
       status: audio.available === false ? 'warn' : 'ok',
     },
     {
@@ -124,7 +124,7 @@ function renderPlaybackFacts(payload) {
     ['Ausgabe', audio.selected_output_label || '-'],
     ['Lautstärke', Number.isFinite(audio.volume_percent) ? `${audio.volume_percent}%` : '-'],
     ['Stumm', audio.muted ? 'Ja' : 'Nein'],
-    ['Route', ['upnp', 'cast'].includes(audio.route_kind) ? 'WLAN-Lautsprecher' : 'Lokal'],
+    ['Route', ['upnp', 'cast', 'airplay'].includes(audio.route_kind) ? 'WLAN-Lautsprecher' : 'Lokal'],
     ['UPnP-Transport', audio.transport_playing ? 'PLAYING' : '-'],
     ['Aktueller Titel', [track.artist, track.title].filter(Boolean).join(' - ') || '-'],
   ]);

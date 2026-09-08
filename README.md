@@ -9,7 +9,7 @@
 ![Display](https://img.shields.io/badge/Display-RPi%207%22-222222)
 ![Android](https://img.shields.io/badge/BBuzzCanvas-Android%205.1-3DDC84?logo=android&logoColor=white)
 
-Ein Raspberry-Pi-basiertes Radio- und Infodisplay mit **Mobile-Webcontroller**, **Albumcover**, **Titelinformationen**, **Uhrzeit**, **Wetter**, **QR-Code**, **Systemmonitoring** und **Audio-Ausgabe auf WLAN-/UPnP- und Google-Cast-Lautsprecher** (z. B. Sonos, Denon oder Samsung Music Frame).
+Ein Raspberry-Pi-basiertes Radio- und Infodisplay mit **Mobile-Webcontroller**, **Albumcover**, **Titelinformationen**, **Uhrzeit**, **Wetter**, **QR-Code**, **Systemmonitoring** und **Audio-Ausgabe auf WLAN-/UPnP-, Google-Cast- und AirPlay-Lautsprecher** (z. B. Sonos, Denon oder Samsung Music Frame).
 
 Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokalen Raspberry-Pi-Display kann ein separates **BBuzzCanvas** als zusätzliches Fullscreen-Coverdisplay genutzt werden.
 
@@ -20,6 +20,7 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 - separates Fullscreen-Coverdisplay auf einem BBuzzCanvas
 - Ausgabe auf WLAN-/UPnP-Lautsprecher wie Sonos oder Denon
 - Ausgabe auf Google-Cast-Lautsprecher wie den Samsung Music Frame
+- Ausgabe auf AirPlay-/RAOP-Lautsprecher (Pi re-streamt, robust bei schwachem WLAN)
 - Touch-Bedienung direkt auf dem Raspberry Pi
 - QR-Code für schnellen Zugriff auf den Webcontroller
 - CPU-, RAM-, Temperatur-, Load-, Throttling- und Uptime-Anzeige im Controller
@@ -183,6 +184,15 @@ http://<PI-IP>:8080/api/system
 - Cast-Wiedergabe-Watchdog startet eine unterbrochene Wiedergabe automatisch neu, greift dabei aber erst nach anhaltendem Stillstand ein (`CAST_PLAYBACK_WATCHDOG_MIN_DOWN_SECONDS`, `CAST_PLAYBACK_WATCHDOG_COOLDOWN_SECONDS`), damit kurze Melde-Aussetzer des Music Frame nicht zu unnötigen Neustarts führen; nach mehreren Fehlversuchen wird die Geräteverbindung bzw. die gesamte Cast-Discovery hart neu aufgesetzt
 - Klang-/Equalizer-Einstellungen erfolgen am Gerät bzw. in dessen App (Samsung Music Frame: SmartThings); Google Cast überträgt nur Lautstärke und Stummschaltung
 
+### AirPlay-Lautsprecher (AirPlay 1 / RAOP)
+
+- automatische Erkennung von AirPlay-/RAOP-Geräten per `pyatv` (z. B. Samsung Music Frame, Denon-Receiver)
+- Auswahl im Controller, Lautstärke, Stummschaltung und Start/Stop
+- **der Raspberry Pi holt den Sender-Stream und re-streamt ihn per RAOP an das Gerät** – RAOP puffert und fordert verlorene Pakete erneut an. Deutlich robuster gegenüber schwachem WLAN des Zielgeräts als ein direkter Stream-Abruf durch das Gerät selbst, und die einzige Alternative, wenn das Gerät (wie der Music Frame) kein UPnP kann.
+- Quelle ist der lokale Relay des Servers (`/upnp-stream/<station>`); pyatv kommt mit endlosen Icecast-URLs direkt nicht zuverlässig klar
+- eigener Wiedergabe-Watchdog startet einen abgebrochenen RAOP-Stream automatisch neu
+- ein Ziel gleichzeitig (kein AirPlay-2-Multiroom); Geräte ohne Pairing/Passwort (die meisten Lautsprecher im „unverschlüsselten RAOP"-Modus)
+
 ### BBuzzCanvas Android-Kiosk
 
 Das BBuzzCanvas verwendet eine kleine Android-5.1-kompatible WebView-Kiosk-App.
@@ -280,7 +290,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 - offizielles Raspberry Pi 7-Zoll-Display
 - WLAN oder LAN im lokalen Netzwerk
 - Smartphone / iPhone für den Controller
-- UPnP-/DLNA-kompatibler WLAN-Lautsprecher oder Google-Cast-Lautsprecher (z. B. Samsung Music Frame)
+- UPnP-/DLNA-, Google-Cast- oder AirPlay-Lautsprecher (z. B. Samsung Music Frame)
 - Python 3
 - Chromium im Kiosk-Modus
 - optional: BBuzzCanvas mit Android 5.1 und BBuzzCanvas Cover Kiosk App

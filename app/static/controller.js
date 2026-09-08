@@ -296,7 +296,7 @@ function renderAudioOutputs(outputs, selectedOutputId) {
   }
   audioOutputsEmpty.classList.add('hidden');
   for (const output of outputs) {
-    if (!['jack', 'upnp', 'cast'].includes(output.kind)) {
+    if (!['jack', 'upnp', 'cast', 'airplay'].includes(output.kind)) {
       continue;
     }
     const button = document.createElement('button');

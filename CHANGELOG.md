@@ -4,6 +4,7 @@ Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert
 
 ## [Unreleased]
 
+- AirPlay/RAOP als Audio-Ausgabe ergänzt (`pyatv`): der Raspberry Pi holt den Sender-Stream und re-streamt ihn per RAOP an den Lautsprecher (robust bei schwachem WLAN des Zielgeräts, u. a. Samsung Music Frame). Auswahl im Controller, Lautstärke/Mute/Start/Stop, eigener Wiedergabe-Watchdog. Ein Ziel gleichzeitig, ohne Pairing.
 - Google Cast als Audio-Ausgabe ergänzt (u. a. Samsung Music Frame): Geräteerkennung per mDNS, Auswahl im Controller, Lautstärke/Mute/Start/Stop.
 - Cast-Wiedergabe übergibt den aufgelösten Sender-Stream direkt an das Gerät statt über den Pi-Relay, damit Dauerstreams nicht nach kurzer Zeit abbrechen.
 - Cast-Wiedergabe-Watchdog ergänzt, der eine unterbrochene Cast-Wiedergabe automatisch neu startet.
