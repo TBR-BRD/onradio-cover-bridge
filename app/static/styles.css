@@ -1427,6 +1427,12 @@ button {
   font-size: 0.96rem;
 }
 
+.device-card-copy .device-kind {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.86rem;
+}
+
 .device-card-copy span,
 .device-card-copy small {
   color: var(--muted);

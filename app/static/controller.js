@@ -947,6 +947,14 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function outputKindLabel(device) {
+  const id = String(device?.id || '');
+  if (id.startsWith('cast:')) return 'Google Cast';
+  if (id.startsWith('airplay:')) return 'AirPlay';
+  if (id.startsWith('upnp:')) return 'UPnP';
+  return device?.protocol || '';
+}
+
 function renderBluetoothDevices(payload) {
   bluetoothState = payload || { renderers: [] };
   const devices = Array.isArray(payload?.renderers) ? payload.renderers : [];
@@ -977,12 +985,14 @@ function renderBluetoothDevices(payload) {
     const card = document.createElement('article');
     card.className = 'device-card';
     const isSelected = device.id === selectedOutputId;
+    const kind = outputKindLabel(device);
+    const name = device.friendly_name || device.name || 'WLAN-Lautsprecher';
     const factLine = [device.host || null, isSelected ? 'als Ausgabe gewählt' : null].filter(Boolean).join(' · ');
     card.innerHTML = `
       <div class="device-card-copy">
-        <strong>${escapeHtml(device.friendly_name || device.name || 'WLAN-Lautsprecher')}</strong>
+        <strong>${escapeHtml(name)}${kind ? ` <span class="device-kind">(${escapeHtml(kind)})</span>` : ''}</strong>
         <span>${escapeHtml(device.host || '-')}</span>
-        <small>${escapeHtml(factLine || (device.protocol || 'WLAN-Lautsprecher'))}</small>
+        <small>${escapeHtml(factLine || kind || 'WLAN-Lautsprecher')}</small>
       </div>
       <div class="device-card-actions"></div>
     `;
