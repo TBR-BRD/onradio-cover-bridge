@@ -20,7 +20,6 @@ class MainActivity : ComponentActivity() {
             TvScreen(
                 state = state,
                 onSelectStation = viewModel::selectStation,
-                onFocusStation = viewModel::setFocusedStation,
             )
         }
     }

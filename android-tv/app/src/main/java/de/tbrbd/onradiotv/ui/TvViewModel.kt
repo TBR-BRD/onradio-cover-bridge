@@ -28,7 +28,6 @@ import okhttp3.OkHttpClient
 data class TvUiState(
     val stations: List<Station> = emptyList(),
     val currentStationId: String? = null,
-    val focusedStationId: String? = null,
     val nowPlaying: NowPlaying? = null,
     val coverUrl: String? = null,
     val weather: WeatherState? = null,
@@ -66,7 +65,7 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
     fun selectStation(stationId: String) {
         val station = _state.value.stations.find { it.id == stationId } ?: return
         _state.update {
-            it.copy(currentStationId = stationId, focusedStationId = stationId, nowPlaying = null, coverUrl = null)
+            it.copy(currentStationId = stationId, nowPlaying = null, coverUrl = null)
         }
 
         viewModelScope.launch {
@@ -85,10 +84,6 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         startMetadataLoop(station)
-    }
-
-    fun setFocusedStation(stationId: String) {
-        _state.update { it.copy(focusedStationId = stationId) }
     }
 
     private fun startMetadataLoop(station: Station) {

@@ -1,5 +1,7 @@
 package de.tbrbd.onradiotv.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -7,7 +9,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -15,10 +16,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,11 +31,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
@@ -58,38 +60,18 @@ private val AccentColor = Color(0xFF7AB6FF)
 private val FocusColor = Color(0xFFFFD166)
 private val MutedColor = Color(0xFFB3BDD6)
 private val TextColor = Color(0xFFF6F8FF)
+private val ScrimColor = Color(0xCC05070D)
+
+private val ENTER_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)
 
 @Composable
 fun TvScreen(
     state: TvUiState,
     onSelectStation: (String) -> Unit,
-    onFocusStation: (String) -> Unit,
 ) {
-    val focusManager = LocalFocusManager.current
+    var isPickerOpen by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgColor)
-            .onKeyEvent { event ->
-                if (event.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onKeyEvent false
-                when (event.key) {
-                    Key.DirectionLeft -> {
-                        focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Left)
-                        true
-                    }
-                    Key.DirectionRight -> {
-                        focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Right)
-                        true
-                    }
-                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                        state.focusedStationId?.let(onSelectStation)
-                        true
-                    }
-                    else -> false
-                }
-            },
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(BgColor)) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -97,7 +79,23 @@ fun TvScreen(
             horizontalArrangement = Arrangement.spacedBy(48.dp),
         ) {
             CoverColumn(coverUrl = state.coverUrl, modifier = Modifier.weight(0.42f).fillMaxHeight())
-            SideColumn(state = state, onFocusStation = onFocusStation, onSelectStation = onSelectStation, modifier = Modifier.weight(0.58f).fillMaxHeight())
+            SideColumn(
+                state = state,
+                onOpenPicker = { isPickerOpen = true },
+                modifier = Modifier.weight(0.58f).fillMaxHeight(),
+            )
+        }
+
+        if (isPickerOpen) {
+            StationPickerOverlay(
+                stations = state.stations,
+                currentStationId = state.currentStationId,
+                onSelect = { id ->
+                    onSelectStation(id)
+                    isPickerOpen = false
+                },
+                onDismiss = { isPickerOpen = false },
+            )
         }
     }
 }
@@ -125,8 +123,7 @@ private fun CoverColumn(coverUrl: String?, modifier: Modifier = Modifier) {
 @Composable
 private fun SideColumn(
     state: TvUiState,
-    onFocusStation: (String) -> Unit,
-    onSelectStation: (String) -> Unit,
+    onOpenPicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentStation = state.stations.find { it.id == state.currentStationId }
@@ -156,12 +153,9 @@ private fun SideColumn(
             WeatherPanel(weather = state.weather, modifier = Modifier.padding(top = 32.dp))
         }
 
-        StationRow(
-            stations = state.stations,
-            currentStationId = state.currentStationId,
-            focusedStationId = state.focusedStationId,
-            onFocusStation = onFocusStation,
-            onSelectStation = onSelectStation,
+        StationSelectorButton(
+            stationName = currentStation?.name ?: "Sender wählen",
+            onOpen = onOpenPicker,
         )
     }
 }
@@ -231,79 +225,24 @@ private fun WeatherPanel(weather: WeatherState?, modifier: Modifier = Modifier) 
     }
 }
 
+/** The always-visible trigger on the main screen; opens the full picker. */
 @Composable
-private fun StationRow(
-    stations: List<Station>,
-    currentStationId: String?,
-    focusedStationId: String?,
-    onFocusStation: (String) -> Unit,
-    onSelectStation: (String) -> Unit,
-) {
-    val firstItemFocusRequester = remember { FocusRequester() }
-
-    Column {
-        Text(
-            text = "Sender  (◀ ▶ wählen · OK schaltet um)",
-            color = MutedColor,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(bottom = 12.dp),
-        )
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            items(stations, key = { it.id }) { station ->
-                val isFirst = station.id == stations.firstOrNull()?.id
-                StationChip(
-                    station = station,
-                    isCurrent = station.id == currentStationId,
-                    onFocused = { onFocusStation(station.id) },
-                    onSelect = { onSelectStation(station.id) },
-                    modifier = if (isFirst) Modifier.focusRequester(firstItemFocusRequester) else Modifier,
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(stations) {
-        if (stations.isNotEmpty()) {
-            firstItemFocusRequester.requestFocus()
-        }
-    }
-}
-
-@Composable
-private fun StationChip(
-    station: Station,
-    isCurrent: Boolean,
-    onFocused: () -> Unit,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun StationSelectorButton(stationName: String, onOpen: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusRequester = remember { FocusRequester() }
 
-    val borderColor = when {
-        isFocused -> FocusColor
-        isCurrent -> AccentColor
-        else -> Color(0x1AFFFFFF)
-    }
-    val backgroundColor = when {
-        isFocused -> Color(0x29FFD166)
-        isCurrent -> Color(0x2E4E95FF)
-        else -> PanelColor
-    }
+    val borderColor = if (isFocused) FocusColor else Color(0x1AFFFFFF)
+    val backgroundColor = if (isFocused) Color(0x29FFD166) else PanelColor
 
     Surface(
-        modifier = modifier
-            .width(220.dp)
-            .onFocusChanged { if (it.isFocused) onFocused() }
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester)
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
-                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
-                    (event.key == Key.Enter || event.key == Key.DirectionCenter || event.key == Key.NumPadEnter)
-                ) {
-                    onSelect()
+                if (event.type == KeyEventType.KeyDown && event.key in ENTER_KEYS) {
+                    onOpen()
                     true
                 } else {
                     false
@@ -311,15 +250,173 @@ private fun StationChip(
             },
         color = backgroundColor,
         shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor),
+        border = BorderStroke(2.dp, borderColor),
     ) {
-        Text(
-            text = station.name,
-            color = TextColor,
-            fontSize = 18.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column {
+                Text("Sender", color = MutedColor, fontSize = 13.sp)
+                Text(stationName, color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Text("OK ▾", color = MutedColor, fontSize = 16.sp)
+        }
+    }
+
+    // The main screen has exactly this one focusable widget, so it should
+    // already carry the D-pad focus as soon as the screen appears.
+    LaunchedEffect(Unit) {
+        try {
+            focusRequester.requestFocus()
+        } catch (_: IllegalStateException) {
+            // Not laid out yet on this frame - harmless, the button is still
+            // reachable, it just won't have focus by default this one time.
+        }
+    }
+}
+
+/** Full-screen scrollable list of every station, opened via the selector button. */
+@Composable
+private fun StationPickerOverlay(
+    stations: List<Station>,
+    currentStationId: String?,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BackHandler(onBack = onDismiss)
+
+    val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+    val currentIndex = remember(stations, currentStationId) {
+        stations.indexOfFirst { it.id == currentStationId }.coerceAtLeast(0)
+    }
+    val itemFocusRequesters = remember(stations) { List(stations.size) { FocusRequester() } }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScrimColor)
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (event.key) {
+                    Key.DirectionUp -> {
+                        focusManager.moveFocus(FocusDirection.Up)
+                        true
+                    }
+                    Key.DirectionDown -> {
+                        focusManager.moveFocus(FocusDirection.Down)
+                        true
+                    }
+                    else -> false
+                }
+            },
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxHeight(0.86f)
+                .width(560.dp)
+                .padding(end = 24.dp),
+            color = PanelColor,
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Sender wählen", color = TextColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "▲ ▼ navigieren · OK wählt · Zurück schließt",
+                    color = MutedColor,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+                )
+
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(stations, key = { _, station -> station.id }) { index, station ->
+                        StationListItem(
+                            station = station,
+                            isCurrent = station.id == currentStationId,
+                            onSelect = { onSelect(station.id) },
+                            modifier = Modifier.focusRequester(itemFocusRequesters[index]),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(stations) {
+        listState.scrollToItem(currentIndex)
+        try {
+            itemFocusRequesters.getOrNull(currentIndex)?.requestFocus()
+        } catch (_: IllegalStateException) {
+            // The target row may not be laid out yet right after
+            // scrollToItem() on this frame; the list stays fully usable via
+            // D-pad, it just starts without a specific focused row this time.
+        }
+    }
+}
+
+@Composable
+private fun StationListItem(
+    station: Station,
+    isCurrent: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val backgroundColor = when {
+        isFocused -> Color(0x29FFD166)
+        isCurrent -> Color(0x2E4E95FF)
+        else -> Color.Transparent
+    }
+    val borderColor = when {
+        isFocused -> FocusColor
+        isCurrent -> AccentColor
+        else -> Color.Transparent
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .focusable(interactionSource = interactionSource)
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key in ENTER_KEYS) {
+                    onSelect()
+                    true
+                } else {
+                    false
+                }
+            },
+        color = backgroundColor,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(2.dp, borderColor),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = station.name,
+                color = TextColor,
+                fontSize = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (isCurrent) {
+                Text("▶", color = AccentColor, fontSize = 16.sp)
+            }
+        }
     }
 }
