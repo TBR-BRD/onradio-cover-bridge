@@ -9,6 +9,7 @@ package de.tbrbd.onradiotv.model
 data class Station(
     val id: String,
     val name: String,
+    val group: String,
     val homepageUrl: String,
     val audioUrl: String,
     val audioMode: String, // "direct" | "pls" | "m3u"

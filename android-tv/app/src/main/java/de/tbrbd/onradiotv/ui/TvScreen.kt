@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -279,7 +281,13 @@ private fun StationSelectorButton(stationName: String, onOpen: () -> Unit) {
     }
 }
 
-/** Full-screen scrollable list of every station, opened via the selector button. */
+/**
+ * Two-pane picker: station "families" (ON Radio, RADIO BOB!, ENERGY, ...) on
+ * the left, the stations within the highlighted family on the right. This
+ * replaced a single flat list of all 253 stations, which was unusable with a
+ * D-pad (up to 253 presses to reach the last one) - the biggest single
+ * family now tops out at 67 (RADIO BOB!).
+ */
 @Composable
 private fun StationPickerOverlay(
     stations: List<Station>,
@@ -290,11 +298,14 @@ private fun StationPickerOverlay(
     BackHandler(onBack = onDismiss)
 
     val focusManager = LocalFocusManager.current
-    val listState = rememberLazyListState()
-    val currentIndex = remember(stations, currentStationId) {
-        stations.indexOfFirst { it.id == currentStationId }.coerceAtLeast(0)
+    val groups = remember(stations) {
+        stations.groupBy { it.group }.map { (name, list) -> name to list }
     }
-    val itemFocusRequesters = remember(stations) { List(stations.size) { FocusRequester() } }
+    val currentGroup = remember(stations, currentStationId) {
+        stations.find { it.id == currentStationId }?.group ?: groups.firstOrNull()?.first ?: ""
+    }
+    var selectedGroup by remember(stations) { mutableStateOf(currentGroup) }
+    val groupFocusRequesters = remember(groups) { groups.associate { it.first to FocusRequester() } }
 
     Box(
         modifier = Modifier
@@ -304,12 +315,16 @@ private fun StationPickerOverlay(
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (event.key) {
                     Key.DirectionUp -> {
-                        focusManager.moveFocus(FocusDirection.Up)
-                        true
+                        focusManager.moveFocus(FocusDirection.Up); true
                     }
                     Key.DirectionDown -> {
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
+                        focusManager.moveFocus(FocusDirection.Down); true
+                    }
+                    Key.DirectionLeft -> {
+                        focusManager.moveFocus(FocusDirection.Left); true
+                    }
+                    Key.DirectionRight -> {
+                        focusManager.moveFocus(FocusDirection.Right); true
                     }
                     else -> false
                 }
@@ -319,7 +334,7 @@ private fun StationPickerOverlay(
         Surface(
             modifier = Modifier
                 .fillMaxHeight(0.86f)
-                .width(560.dp)
+                .width(880.dp)
                 .padding(end = 24.dp),
             color = PanelColor,
             shape = RoundedCornerShape(20.dp),
@@ -327,37 +342,109 @@ private fun StationPickerOverlay(
             Column(modifier = Modifier.padding(24.dp)) {
                 Text("Sender wählen", color = TextColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "▲ ▼ navigieren · OK wählt · Zurück schließt",
+                    "◀ ▶ Kategorie/Liste · ▲ ▼ navigieren · OK wählt · Zurück schließt",
                     color = MutedColor,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
                 )
 
-                LazyColumn(
-                    state = listState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    itemsIndexed(stations, key = { _, station -> station.id }) { index, station ->
-                        StationListItem(
-                            station = station,
-                            isCurrent = station.id == currentStationId,
-                            onSelect = { onSelect(station.id) },
-                            modifier = Modifier.focusRequester(itemFocusRequesters[index]),
-                        )
-                    }
+                Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    GroupList(
+                        groups = groups,
+                        selectedGroup = selectedGroup,
+                        onGroupFocused = { selectedGroup = it },
+                        focusRequesters = groupFocusRequesters,
+                        modifier = Modifier.weight(0.4f).fillMaxHeight(),
+                    )
+                    StationList(
+                        stations = groups.find { it.first == selectedGroup }?.second ?: emptyList(),
+                        currentStationId = currentStationId,
+                        onSelect = onSelect,
+                        modifier = Modifier.weight(0.6f).fillMaxHeight(),
+                    )
                 }
             }
         }
     }
 
-    LaunchedEffect(stations) {
-        listState.scrollToItem(currentIndex)
+    LaunchedEffect(groups) {
         try {
-            itemFocusRequesters.getOrNull(currentIndex)?.requestFocus()
+            groupFocusRequesters[selectedGroup]?.requestFocus()
         } catch (_: IllegalStateException) {
-            // The target row may not be laid out yet right after
-            // scrollToItem() on this frame; the list stays fully usable via
-            // D-pad, it just starts without a specific focused row this time.
+            // Not laid out yet this frame - list stays usable, just without
+            // an initial focus target this one time.
+        }
+    }
+}
+
+@Composable
+private fun GroupList(
+    groups: List<Pair<String, List<Station>>>,
+    selectedGroup: String?,
+    onGroupFocused: (String) -> Unit,
+    focusRequesters: Map<String, FocusRequester>,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        items(groups, key = { it.first }) { (groupName, groupStations) ->
+            val interactionSource = remember { MutableInteractionSource() }
+            val isFocused by interactionSource.collectIsFocusedAsState()
+            val isSelected = groupName == selectedGroup
+
+            val backgroundColor = when {
+                isFocused -> Color(0x29FFD166)
+                isSelected -> Color(0x2E4E95FF)
+                else -> Color.Transparent
+            }
+            val borderColor = when {
+                isFocused -> FocusColor
+                isSelected -> AccentColor
+                else -> Color.Transparent
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequesters.getValue(groupName))
+                    .focusable(interactionSource = interactionSource)
+                    .onFocusChanged { if (it.isFocused) onGroupFocused(groupName) },
+                color = backgroundColor,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(2.dp, borderColor),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(groupName, color = TextColor, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${groupStations.size}", color = MutedColor, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StationList(
+    stations: List<Station>,
+    currentStationId: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    key(stations.firstOrNull()?.group) {
+        val listState = rememberLazyListState()
+        LazyColumn(
+            state = listState,
+            modifier = modifier,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(stations, key = { it.id }) { station ->
+                StationListItem(
+                    station = station,
+                    isCurrent = station.id == currentStationId,
+                    onSelect = { onSelect(station.id) },
+                )
+            }
         }
     }
 }

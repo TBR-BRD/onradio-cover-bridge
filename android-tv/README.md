@@ -44,11 +44,22 @@ dataclasses.dataclass = patched  # nur noetig auf Python < 3.10
 sys.path.insert(0, ".")
 from app.stations import STATIONS
 
+def group_for(station_id):
+    if station_id.startswith("on-"): return "ON Radio"
+    if station_id.startswith("80s80s-"): return "80s80s"
+    if station_id.startswith("sunshine-live"): return "Sunshine Live"
+    if station_id.startswith("radio-bob-"): return "RADIO BOB!"
+    if station_id.startswith("ffh-"): return "HIT RADIO FFH"
+    if station_id.startswith("absolut-"): return "Absolut Radio"
+    if station_id.startswith("energy-"): return "ENERGY"
+    return "Weitere Sender"
+
 out = []
 for s in STATIONS:
     d = dataclasses.asdict(s)
     out.append({
-        "id": d["id"], "name": d["name"], "homepageUrl": d["homepage_url"],
+        "id": d["id"], "name": d["name"], "group": group_for(d["id"]),
+        "homepageUrl": d["homepage_url"],
         "audioUrl": d["audio_url"], "audioMode": d["audio_mode"],
         "metadataUrl": d["metadata_url"], "metadataMode": d["metadata_mode"],
         "metadataStationLabel": d["metadata_station_label"],
@@ -98,8 +109,12 @@ Fehlern gerne zurückmelden, dann wird gezielt nachgebessert.
 
 ## Bedienung
 
-- **◀ / ▶**: Fokus zwischen Sendern bewegen
-- **OK / Auswahltaste**: fokussierten Sender abspielen
+- **OK** auf dem „Sender"-Knopf öffnet die Senderauswahl
+- Die Auswahl ist **zweispaltig**: links Kategorien (ON Radio, RADIO BOB!, ENERGY, HIT RADIO FFH, Absolut Radio, 80s80s, Sunshine Live, Weitere Sender), rechts die Sender der markierten Kategorie
+- **◀ / ▶**: zwischen Kategorie- und Senderspalte wechseln
+- **▲ / ▼**: innerhalb der aktiven Spalte navigieren
+- **OK** auf einem Sender: abspielen und Auswahl schließen
+- **Zurück**: Auswahl schließen, ohne umzuschalten
 - Metadaten/Cover aktualisieren sich alle 15 Sekunden, Wetter alle 10 Minuten
 
 ## Standort für Wetter ändern

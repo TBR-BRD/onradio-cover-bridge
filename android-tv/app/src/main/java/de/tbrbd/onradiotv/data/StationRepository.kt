@@ -19,6 +19,7 @@ class StationRepository(private val context: Context) {
             Station(
                 id = obj.getString("id"),
                 name = obj.getString("name"),
+                group = obj.optString("group", "Weitere Sender"),
                 homepageUrl = obj.optString("homepageUrl", ""),
                 audioUrl = obj.getString("audioUrl"),
                 audioMode = obj.optString("audioMode", "direct"),
