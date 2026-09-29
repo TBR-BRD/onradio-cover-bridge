@@ -402,12 +402,30 @@ private fun GroupList(
                 else -> Color.Transparent
             }
 
+            val focusManager = LocalFocusManager.current
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequesters.getValue(groupName))
+                    // onFocusChanged must come BEFORE focusable() in the chain -
+                    // it only observes focus targets that are its descendants
+                    // (later in the chain), so the reverse order silently never
+                    // fires. This was the actual bug: focusing a category never
+                    // updated the station list on the right.
+                    .onFocusChanged { if (it.isFocused) onGroupFocused(groupName) }
                     .focusable(interactionSource = interactionSource)
-                    .onFocusChanged { if (it.isFocused) onGroupFocused(groupName) },
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key in ENTER_KEYS) {
+                            // OK on a category also jumps focus straight into
+                            // its station list, since some viewers expect OK
+                            // to "confirm" rather than relying only on the
+                            // focus-follows-preview behaviour above.
+                            focusManager.moveFocus(FocusDirection.Right)
+                            true
+                        } else {
+                            false
+                        }
+                    },
                 color = backgroundColor,
                 shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(2.dp, borderColor),
