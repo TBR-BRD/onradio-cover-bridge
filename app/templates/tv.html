@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radio TV</title>
+  <link rel="stylesheet" href="/static/tv.css?v=1">
+</head>
+<body class="tv-body">
+  <div id="tvBackground" class="tv-background"></div>
+
+  <main class="tv-shell">
+    <section class="tv-cover-column">
+      <div class="tv-cover-frame">
+        <img id="tvCover" class="tv-cover" src="/static/kein-cover.svg" alt="Albumcover">
+      </div>
+    </section>
+
+    <section class="tv-side-column">
+      <header class="tv-header">
+        <p id="tvStationName" class="tv-station-name">Radio Cover Bridge</p>
+        <div class="tv-clock-block">
+          <p id="tvClock" class="tv-clock">--:--</p>
+          <p id="tvDate" class="tv-date">--</p>
+        </div>
+      </header>
+
+      <div class="tv-track-block">
+        <h1 id="tvTitle" class="tv-title">Noch kein Titel</h1>
+        <p id="tvArtist" class="tv-artist">Bitte einen Sender auswählen.</p>
+      </div>
+
+      <section id="tvWeatherPanel" class="tv-weather-panel hidden" aria-label="Wetter">
+        <div class="tv-weather-header">
+          <img id="tvWeatherIcon" class="tv-weather-icon hidden" src="" alt="">
+          <div class="tv-weather-current">
+            <p id="tvWeatherTemp" class="tv-weather-temp">--°</p>
+            <p id="tvWeatherCondition" class="tv-weather-condition">-</p>
+          </div>
+        </div>
+        <div id="tvWeatherDays" class="tv-weather-days"></div>
+      </section>
+
+      <section class="tv-stations-panel" aria-label="Sender">
+        <p class="tv-stations-label">Sender <span id="tvStationsHint" class="tv-stations-hint">(◀ ▶ zum Wählen, OK zum Umschalten)</span></p>
+        <div id="tvStationsList" class="tv-stations-list" role="listbox" aria-label="Senderauswahl"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    window.__INITIAL_STATE__ = {{ initial_state_json | safe }};
+    window.__POLL_INTERVAL_MS__ = {{ poll_interval_ms }};
+  </script>
+  <script src="/static/tv.js?v=1"></script>
+</body>
+</html>

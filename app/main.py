@@ -1205,6 +1205,17 @@ async def display(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "display.html", context)
 
 
+@app.get("/tv", response_class=HTMLResponse)
+async def tv_display(request: Request) -> HTMLResponse:
+    snapshot = await services.snapshot()
+    context = {
+        "request": request,
+        "initial_state_json": json.dumps(snapshot, ensure_ascii=False),
+        "poll_interval_ms": settings.poll_interval_seconds * 1000,
+    }
+    return templates.TemplateResponse(request, "tv.html", context)
+
+
 @app.get("/api/stations")
 async def list_stations() -> dict[str, Any]:
     return await services.list_stations()

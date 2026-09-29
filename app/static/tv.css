@@ -1,0 +1,287 @@
+:root {
+  color-scheme: dark;
+  --bg: #080b14;
+  --panel: rgba(16, 21, 35, 0.85);
+  --panel-soft: rgba(22, 28, 47, 0.75);
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #f6f8ff;
+  --muted: #b3bdd6;
+  --accent: #7ab6ff;
+  --accent-strong: #4e95ff;
+  --focus-ring: #ffd166;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* Base scale tuned for a 1920x1080 logical viewport on a 4K TV (most Android
+   TV WebViews report ~1080p CSS pixels at devicePixelRatio 2). Everything
+   below uses vw/vh/clamp() so it still scales sanely at other resolutions. */
+html {
+  font-size: clamp(14px, 1.35vw, 26px);
+}
+
+.tv-body {
+  position: relative;
+}
+
+.tv-background {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 20% 15%, #1c2b52 0%, var(--bg) 60%);
+  z-index: 0;
+}
+
+.tv-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  padding: 3.5vh 3.5vw;
+  gap: 3vw;
+}
+
+/* --- Cover column --- */
+.tv-cover-column {
+  flex: 0 0 42vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tv-cover-frame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 2rem 5rem rgba(0, 0, 0, 0.55);
+  background: var(--panel-soft);
+}
+
+.tv-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* --- Side column --- */
+.tv-side-column {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2vh;
+}
+
+.tv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.tv-station-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.tv-clock-block {
+  text-align: right;
+}
+
+.tv-clock {
+  font-size: 2.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.tv-date {
+  margin-top: 0.3rem;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.tv-track-block {
+  min-width: 0;
+}
+
+.tv-title {
+  font-size: 2.8rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-wrap: balance;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tv-artist {
+  margin-top: 0.5rem;
+  font-size: 1.4rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Weather --- */
+.tv-weather-panel {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--panel);
+  padding: 1.2rem 1.5rem;
+}
+
+.tv-weather-panel.hidden {
+  display: none;
+}
+
+.tv-weather-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tv-weather-icon {
+  width: 3.2rem;
+  height: 3.2rem;
+}
+
+.tv-weather-icon.hidden {
+  display: none;
+}
+
+.tv-weather-temp {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tv-weather-condition {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+.tv-weather-days {
+  margin-top: 1rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.tv-weather-day {
+  flex: 1;
+  border-radius: 0.7rem;
+  background: var(--panel-soft);
+  padding: 0.7rem 0.9rem;
+  text-align: center;
+}
+
+.tv-weather-day-label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.tv-weather-day-temp {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* --- Stations --- */
+.tv-stations-panel {
+  margin-top: auto;
+}
+
+.tv-stations-label {
+  margin-bottom: 0.8rem;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.tv-stations-hint {
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 0.7;
+}
+
+.tv-stations-list {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+  scrollbar-width: none;
+}
+
+.tv-stations-list::-webkit-scrollbar {
+  display: none;
+}
+
+.tv-station-item {
+  flex: 0 0 auto;
+  min-width: 10rem;
+  padding: 0.9rem 1.3rem;
+  border-radius: 0.8rem;
+  border: 2px solid var(--border);
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 1.15rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.tv-station-item.is-current {
+  border-color: var(--accent-strong);
+  background: rgba(78, 149, 255, 0.18);
+}
+
+.tv-station-item.is-current::before {
+  content: "▶ ";
+  color: var(--accent);
+}
+
+/* This is the state that matters most: a D-pad user must see, at a glance
+   from across the room, exactly which item has focus. */
+.tv-station-item:focus,
+.tv-station-item:focus-visible {
+  outline: none;
+  border-color: var(--focus-ring);
+  background: rgba(255, 209, 102, 0.16);
+  transform: scale(1.06);
+  box-shadow: 0 0 0 0.2rem rgba(255, 209, 102, 0.35);
+}
+
+@media (max-width: 900px) {
+  .tv-shell {
+    flex-direction: column;
+  }
+
+  .tv-cover-column {
+    flex: 0 0 auto;
+  }
+}
