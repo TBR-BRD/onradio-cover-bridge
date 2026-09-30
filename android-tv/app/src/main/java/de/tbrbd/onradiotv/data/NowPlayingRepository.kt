@@ -1,11 +1,14 @@
 package de.tbrbd.onradiotv.data
 
+import android.util.Log
 import de.tbrbd.onradiotv.model.NowPlaying
 import de.tbrbd.onradiotv.model.Station
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+
+private const val TAG = "NowPlayingRepository"
 
 private val STREAM_TITLE_RE = Regex("""StreamTitle=['"]([^'"]*)['"];""", RegexOption.IGNORE_CASE)
 private val ARTIST_KEYS = listOf("artist", "artist_name", "artistName", "interpret")
@@ -31,7 +34,8 @@ class NowPlayingRepository(
                 "icy_stream" -> fetchIcyStream(station)
                 else -> fallback(station)
             }
-        } catch (_: Exception) {
+        } catch (exc: Exception) {
+            Log.w(TAG, "Metadata fetch failed for ${station.id} (${station.metadataMode}): $exc")
             fallback(station)
         }
     }
@@ -107,21 +111,40 @@ class NowPlayingRepository(
             .build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return fallback(station)
+            if (!response.isSuccessful) {
+                Log.w(TAG, "${station.id}: HTTP ${response.code} from $resolvedUrl")
+                return fallback(station)
+            }
             val metaInt = response.header("icy-metaint")?.toIntOrNull()
-                ?: return fallback(station)
-            if (metaInt <= 0 || metaInt > 1_048_576) return fallback(station)
+            if (metaInt == null) {
+                Log.w(TAG, "${station.id}: no icy-metaint header (headers: ${response.headers})")
+                return fallback(station)
+            }
+            if (metaInt <= 0 || metaInt > 1_048_576) {
+                Log.w(TAG, "${station.id}: implausible icy-metaint=$metaInt")
+                return fallback(station)
+            }
 
             val input = response.body?.byteStream() ?: return fallback(station)
             repeat(3) {
-                if (!skipFully(input, metaInt)) return fallback(station)
+                if (!skipFully(input, metaInt)) {
+                    Log.w(TAG, "${station.id}: stream ended while skipping audio block")
+                    return fallback(station)
+                }
                 val lengthByte = input.read()
-                if (lengthByte < 0) return fallback(station)
+                if (lengthByte < 0) {
+                    Log.w(TAG, "${station.id}: stream ended while reading metadata length byte")
+                    return fallback(station)
+                }
                 val metadataLength = lengthByte * 16
                 if (metadataLength <= 0) return@repeat
                 val metadataBytes = ByteArray(metadataLength)
-                if (!readFully(input, metadataBytes)) return fallback(station)
+                if (!readFully(input, metadataBytes)) {
+                    Log.w(TAG, "${station.id}: stream ended while reading metadata block")
+                    return fallback(station)
+                }
                 val decoded = String(metadataBytes, Charsets.UTF_8).trimEnd('\u0000')
+                Log.d(TAG, "${station.id}: raw ICY metadata = ${decoded.take(200)}")
                 val match = STREAM_TITLE_RE.find(decoded) ?: return@repeat
                 val streamTitle = match.groupValues[1].trim()
                 if (streamTitle.isEmpty()) return@repeat

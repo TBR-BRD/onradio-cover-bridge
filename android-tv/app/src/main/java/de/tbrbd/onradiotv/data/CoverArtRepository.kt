@@ -1,9 +1,12 @@
 package de.tbrbd.onradiotv.data
 
+import android.util.Log
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+
+private const val TAG = "CoverArtRepository"
 
 /**
  * Simplified port of app/cover_provider.py's iTunes Search lookup (the
@@ -34,9 +37,15 @@ class CoverArtRepository(private val client: OkHttpClient) {
 
         val result = try {
             client.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                if (!response.isSuccessful) return@use null
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "iTunes search HTTP ${response.code} for \"$query\"")
+                    return@use null
+                }
                 val body = response.body?.string() ?: return@use null
                 val results = JSONObject(body).optJSONArray("results") ?: return@use null
+                if (results.length() == 0) {
+                    Log.d(TAG, "No iTunes results for \"$query\"")
+                }
                 var best: String? = null
                 for (i in 0 until results.length()) {
                     val item = results.getJSONObject(i)
@@ -48,7 +57,8 @@ class CoverArtRepository(private val client: OkHttpClient) {
                 }
                 best
             }
-        } catch (_: Exception) {
+        } catch (exc: Exception) {
+            Log.w(TAG, "iTunes search failed for \"$query\": $exc")
             null
         }
 
