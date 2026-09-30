@@ -114,7 +114,11 @@ Fehlern gerne zurückmelden, dann wird gezielt nachgebessert.
 - **◀ / ▶**: zwischen Kategorie- und Senderspalte wechseln
 - **▲ / ▼**: innerhalb der aktiven Spalte navigieren
 - **OK** auf einem Sender: abspielen und Auswahl schließen
+- **OK lang gedrückt** auf einem Sender: als Favorit markieren/entfernen (★), ohne umzuschalten
 - **Zurück**: Auswahl schließen, ohne umzuschalten
+- Ganz oben erscheint automatisch eine Kategorie **„★ Favoriten"**, sobald mindestens ein Sender favorisiert ist
+- Pro Kategorie wird sich der zuletzt gewählte Sender gemerkt (lokal auf dem Gerät, übersteht App-Neustart) - erneutes Öffnen einer Kategorie springt dorthin statt immer zum ersten Eintrag
+- Der zuletzt gespielte Sender wird beim nächsten App-Start automatisch fortgesetzt
 - Metadaten/Cover aktualisieren sich alle 15 Sekunden, Wetter alle 10 Minuten
 
 ## Standort für Wetter ändern

@@ -20,6 +20,8 @@ class MainActivity : ComponentActivity() {
             TvScreen(
                 state = state,
                 onSelectStation = viewModel::selectStation,
+                onToggleFavorite = viewModel::toggleFavorite,
+                lastStationForGroup = viewModel::lastStationForGroup,
             )
         }
     }

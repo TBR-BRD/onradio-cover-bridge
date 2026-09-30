@@ -3,6 +3,7 @@ package de.tbrbd.onradiotv.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import de.tbrbd.onradiotv.data.AppPreferences
 import de.tbrbd.onradiotv.data.AudioStreamResolver
 import de.tbrbd.onradiotv.data.CoverArtRepository
 import de.tbrbd.onradiotv.data.NowPlayingRepository
@@ -28,6 +29,7 @@ import okhttp3.OkHttpClient
 data class TvUiState(
     val stations: List<Station> = emptyList(),
     val currentStationId: String? = null,
+    val favoriteIds: Set<String> = emptySet(),
     val nowPlaying: NowPlaying? = null,
     val coverUrl: String? = null,
     val weather: WeatherState? = null,
@@ -49,6 +51,7 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
     private val coverArtRepository = CoverArtRepository(client)
     private val weatherRepository = WeatherRepository(client)
     private val player = RadioPlayer(application)
+    private val prefs = AppPreferences(application)
 
     private val _state = MutableStateFlow(TvUiState())
     val state: StateFlow<TvUiState> = _state.asStateFlow()
@@ -57,13 +60,20 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val stations = stationRepository.loadStations()
-        _state.update { it.copy(stations = stations) }
-        stations.firstOrNull()?.let { selectStation(it.id) }
+        _state.update { it.copy(stations = stations, favoriteIds = prefs.favoriteIds()) }
+
+        // Resume where the viewer left off last time, if that station still
+        // exists in the catalog; otherwise just start from the top.
+        val resumeId = prefs.lastPlayedStationId()?.let { id -> stations.find { it.id == id }?.id }
+        (resumeId ?: stations.firstOrNull()?.id)?.let { selectStation(it) }
+
         refreshWeatherLoop()
     }
 
     fun selectStation(stationId: String) {
         val station = _state.value.stations.find { it.id == stationId } ?: return
+        prefs.setLastStationForGroup(station.group, stationId)
+        prefs.setLastPlayedStationId(stationId)
         _state.update {
             it.copy(currentStationId = stationId, nowPlaying = null, coverUrl = null)
         }
@@ -85,6 +95,13 @@ class TvViewModel(application: Application) : AndroidViewModel(application) {
 
         startMetadataLoop(station)
     }
+
+    fun toggleFavorite(stationId: String) {
+        val updated = prefs.toggleFavorite(stationId)
+        _state.update { it.copy(favoriteIds = updated) }
+    }
+
+    fun lastStationForGroup(group: String): String? = prefs.lastStationForGroup(group)
 
     private fun startMetadataLoop(station: Station) {
         metadataJob?.cancel()

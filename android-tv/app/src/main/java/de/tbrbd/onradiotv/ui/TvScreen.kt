@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -70,6 +71,8 @@ private val ENTER_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)
 fun TvScreen(
     state: TvUiState,
     onSelectStation: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
+    lastStationForGroup: (String) -> String?,
 ) {
     var isPickerOpen by remember { mutableStateOf(false) }
 
@@ -92,10 +95,13 @@ fun TvScreen(
             StationPickerOverlay(
                 stations = state.stations,
                 currentStationId = state.currentStationId,
+                favoriteIds = state.favoriteIds,
+                lastStationForGroup = lastStationForGroup,
                 onSelect = { id ->
                     onSelectStation(id)
                     isPickerOpen = false
                 },
+                onToggleFavorite = onToggleFavorite,
                 onDismiss = { isPickerOpen = false },
             )
         }
@@ -288,24 +294,43 @@ private fun StationSelectorButton(stationName: String, onOpen: () -> Unit) {
  * D-pad (up to 253 presses to reach the last one) - the biggest single
  * family now tops out at 67 (RADIO BOB!).
  */
+private const val FAVORITES_GROUP = "★ Favoriten"
+
 @Composable
 private fun StationPickerOverlay(
     stations: List<Station>,
     currentStationId: String?,
+    favoriteIds: Set<String>,
+    lastStationForGroup: (String) -> String?,
     onSelect: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
 
     val focusManager = LocalFocusManager.current
-    val groups = remember(stations) {
-        stations.groupBy { it.group }.map { (name, list) -> name to list }
+    val favoriteStations = remember(stations, favoriteIds) {
+        stations.filter { it.id in favoriteIds }
+    }
+    val groups = remember(stations, favoriteStations) {
+        val base = stations.groupBy { it.group }.map { (name, list) -> name to list }
+        if (favoriteStations.isEmpty()) base else listOf(FAVORITES_GROUP to favoriteStations) + base
     }
     val currentGroup = remember(stations, currentStationId) {
         stations.find { it.id == currentStationId }?.group ?: groups.firstOrNull()?.first ?: ""
     }
     var selectedGroup by remember(stations) { mutableStateOf(currentGroup) }
     val groupFocusRequesters = remember(groups) { groups.associate { it.first to FocusRequester() } }
+
+    val currentGroupStations = groups.find { it.first == selectedGroup }?.second ?: emptyList()
+    // Prefer the currently playing station if it's in this group, otherwise
+    // whatever was last picked here (persisted), otherwise the top entry.
+    val preferredStationId = remember(selectedGroup, currentStationId, currentGroupStations) {
+        when {
+            currentGroupStations.any { it.id == currentStationId } -> currentStationId
+            else -> lastStationForGroup(selectedGroup)?.takeIf { id -> currentGroupStations.any { it.id == id } }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -342,7 +367,7 @@ private fun StationPickerOverlay(
             Column(modifier = Modifier.padding(24.dp)) {
                 Text("Sender wählen", color = TextColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "◀ ▶ Kategorie/Liste · ▲ ▼ navigieren · OK wählt · Zurück schließt",
+                    "◀ ▶ Kategorie/Liste · ▲ ▼ navigieren · OK wählt · lang drücken = Favorit · Zurück schließt",
                     color = MutedColor,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
@@ -357,9 +382,13 @@ private fun StationPickerOverlay(
                         modifier = Modifier.weight(0.4f).fillMaxHeight(),
                     )
                     StationList(
-                        stations = groups.find { it.first == selectedGroup }?.second ?: emptyList(),
+                        groupKey = selectedGroup,
+                        stations = currentGroupStations,
                         currentStationId = currentStationId,
+                        preferredStationId = preferredStationId,
+                        favoriteIds = favoriteIds,
                         onSelect = onSelect,
+                        onToggleFavorite = onToggleFavorite,
                         modifier = Modifier.weight(0.6f).fillMaxHeight(),
                     )
                 }
@@ -444,13 +473,28 @@ private fun GroupList(
 
 @Composable
 private fun StationList(
+    groupKey: String,
     stations: List<Station>,
     currentStationId: String?,
+    preferredStationId: String?,
+    favoriteIds: Set<String>,
     onSelect: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    key(stations.firstOrNull()?.group) {
+    // Keyed on the category itself (not just its content) so switching
+    // categories always gets a fresh scroll position and fresh focus
+    // requesters instead of reusing stale ones from the previous list.
+    key(groupKey) {
         val listState = rememberLazyListState()
+        val itemFocusRequesters = remember(stations) { stations.associate { it.id to FocusRequester() } }
+        val targetId = remember(stations, preferredStationId) {
+            preferredStationId ?: stations.firstOrNull()?.id
+        }
+        val targetIndex = remember(stations, targetId) {
+            stations.indexOfFirst { it.id == targetId }.coerceAtLeast(0)
+        }
+
         LazyColumn(
             state = listState,
             modifier = modifier,
@@ -460,8 +504,22 @@ private fun StationList(
                 StationListItem(
                     station = station,
                     isCurrent = station.id == currentStationId,
+                    isFavorite = station.id in favoriteIds,
                     onSelect = { onSelect(station.id) },
+                    onToggleFavorite = { onToggleFavorite(station.id) },
+                    modifier = Modifier.focusRequester(itemFocusRequesters.getValue(station.id)),
                 )
+            }
+        }
+
+        LaunchedEffect(groupKey) {
+            if (stations.isEmpty()) return@LaunchedEffect
+            listState.scrollToItem(targetIndex)
+            try {
+                itemFocusRequesters[targetId]?.requestFocus()
+            } catch (_: IllegalStateException) {
+                // Not laid out yet this frame - list stays usable, just
+                // without a specific initial focus target this one time.
             }
         }
     }
@@ -471,7 +529,9 @@ private fun StationList(
 private fun StationListItem(
     station: Station,
     isCurrent: Boolean,
+    isFavorite: Boolean,
     onSelect: () -> Unit,
+    onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -494,7 +554,15 @@ private fun StationListItem(
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && event.key in ENTER_KEYS) {
-                    onSelect()
+                    // Short press OK = play this station. Long press OK
+                    // (Android reports this on the underlying native key
+                    // event) = toggle it as a favorite instead, without
+                    // switching away from what's currently playing.
+                    if (event.nativeKeyEvent.isLongPress) {
+                        onToggleFavorite()
+                    } else {
+                        onSelect()
+                    }
                     true
                 } else {
                     false
@@ -512,8 +580,8 @@ private fun StationListItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = station.name,
-                color = TextColor,
+                text = (if (isFavorite) "★ " else "") + station.name,
+                color = if (isFavorite) FocusColor else TextColor,
                 fontSize = 18.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
