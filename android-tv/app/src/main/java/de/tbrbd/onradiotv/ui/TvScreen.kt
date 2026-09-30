@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -414,7 +415,7 @@ private fun GroupList(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        items(groups, key = { it.first }) { (groupName, groupStations) ->
+        itemsIndexed(groups, key = { _, g -> g.first }) { index, (groupName, groupStations) ->
             val interactionSource = remember { MutableInteractionSource() }
             val isFocused by interactionSource.collectIsFocusedAsState()
             val isSelected = groupName == selectedGroup
@@ -441,6 +442,14 @@ private fun GroupList(
                     // fires. This was the actual bug: focusing a category never
                     // updated the station list on the right.
                     .onFocusChanged { if (it.isFocused) onGroupFocused(groupName) }
+                    .then(
+                        // Without this, pressing Up on the very first row has no
+                        // "up" neighbour in this column, so Compose's spatial
+                        // search picks the nearest focusable anywhere on screen -
+                        // which is usually the station list on the right. Cancel
+                        // makes Up a no-op here instead of jumping across panes.
+                        if (index == 0) Modifier.focusProperties { up = FocusRequester.Cancel } else Modifier
+                    )
                     .focusable(interactionSource = interactionSource)
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key in ENTER_KEYS) {
@@ -499,11 +508,12 @@ private fun StationList(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(stations, key = { it.id }) { station ->
+            itemsIndexed(stations, key = { _, s -> s.id }) { index, station ->
                 StationListItem(
                     station = station,
                     isCurrent = station.id == currentStationId,
                     isFavorite = station.id in favoriteIds,
+                    isFirst = index == 0,
                     onSelect = { onSelect(station.id) },
                     onToggleFavorite = { onToggleFavorite(station.id) },
                     modifier = Modifier.focusRequester(itemFocusRequesters.getValue(station.id)),
@@ -529,6 +539,7 @@ private fun StationListItem(
     station: Station,
     isCurrent: Boolean,
     isFavorite: Boolean,
+    isFirst: Boolean,
     onSelect: () -> Unit,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
@@ -550,6 +561,10 @@ private fun StationListItem(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            // See the matching comment in GroupList - without this, Up at the
+            // top of this column jumps focus over to the category list
+            // instead of just staying put.
+            .then(if (isFirst) Modifier.focusProperties { up = FocusRequester.Cancel } else Modifier)
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && event.key in ENTER_KEYS) {
