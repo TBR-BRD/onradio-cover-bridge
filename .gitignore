@@ -10,3 +10,4 @@ __pycache__/
 data/config.json
 data/backups/
 data/state.json
+data/stations_cache.json

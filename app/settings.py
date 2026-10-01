@@ -69,6 +69,12 @@ class Settings:
     selftest_timeout_seconds: int = int(os.getenv("SELFTEST_TIMEOUT_SECONDS", "15"))
     upnp_discovery_cache_seconds: int = int(os.getenv("UPNP_DISCOVERY_CACHE_SECONDS", "120"))
     upnp_request_timeout_seconds: int = int(os.getenv("UPNP_REQUEST_TIMEOUT_SECONDS", "6"))
+    stations_catalog_url: str = os.getenv(
+        "STATIONS_CATALOG_URL",
+        "https://raw.githubusercontent.com/TBR-BRD/radiostations/main/stations.json",
+    ).strip()
+    stations_cache_file: Path = Path(os.getenv("STATIONS_CACHE_FILE", str(DATA_DIR / "stations_cache.json")))
+    stations_fetch_timeout_seconds: int = int(os.getenv("STATIONS_FETCH_TIMEOUT_SECONDS", "5"))
 
     @property
     def user_agent(self) -> str:
