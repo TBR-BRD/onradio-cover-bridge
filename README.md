@@ -81,6 +81,7 @@ https://github.com/TBR-BRD/bbuzzcanvas-cover-kiosk
 - Wiedergabe über WLAN-/UPnP-Lautsprecher
 - Wiedergabe über Google-Cast-Lautsprecher (z. B. Samsung Music Frame)
 - Stream-Relay über den Raspberry Pi für bessere Renderer-Kompatibilität
+- Senderkatalog wird von [radiostations](https://github.com/TBR-BRD/radiostations) geladen (automatisch gepflegt, dort auch von der GoogleTV-App genutzt), mit lokalem Cache/Fallback, falls das nicht erreichbar ist
 
 ### Titelinformationen und Metadaten
 
