@@ -623,14 +623,6 @@ STATIONS: tuple[Station, ...] = (
         metadata_url="http://dispatcher.rndfnk.com/rbb/inforadio/live/mp3/mid",
         metadata_mode="icy_stream",
     ),
-    Station(
-        id="test-verify-workflow",
-        name="TEST - verify radiostations workflow",
-        homepage_url="https://example.com/",
-        audio_url="https://example.com/test.mp3",
-        metadata_url="https://example.com/test.mp3",
-        metadata_mode="icy_stream",
-    ),
 )
 
 STATION_MAP: dict[str, Station] = {station.id: station for station in STATIONS}
