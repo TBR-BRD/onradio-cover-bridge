@@ -13,6 +13,8 @@ Ein Raspberry-Pi-basiertes Radio- und Infodisplay mit **Mobile-Webcontroller**, 
 
 Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokalen Raspberry-Pi-Display kann ein separates **BBuzzCanvas** als zusätzliches Fullscreen-Coverdisplay genutzt werden.
 
+> 📺 Für Google TV/Android TV gibt es eine eigenständige App (läuft ohne Pi) im separaten Repo [**googletv-musicplayer**](https://github.com/TBR-BRD/googletv-musicplayer).
+
 ## Highlights
 
 - Internetradio-Steuerung per Smartphone im lokalen Netzwerk
