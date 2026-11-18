@@ -15,6 +15,12 @@ Das System verwendet einen Raspberry Pi 3 als zentrale Instanz. Neben dem lokale
 
 > 📺 Für Google TV/Android TV gibt es eine eigenständige App (läuft ohne Pi) im separaten Repo [**googletv-musicplayer**](https://github.com/TBR-BRD/googletv-musicplayer).
 
+<br>
+<a href="https://www.buymeacoffee.com/thoralf.brandt" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174">
+</a>
+<br>
+
 ## Highlights
 
 - Internetradio-Steuerung per Smartphone im lokalen Netzwerk

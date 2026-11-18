@@ -13,6 +13,12 @@ A Raspberry Pi based **radio and information display** with a **mobile web contr
 The system is designed for a Raspberry Pi 3 with the official 7-inch display as a permanent kiosk display on a local home network.  
 Control is handled comfortably from an iPhone or any other smartphone on the same Wi-Fi network.
 
+<br>
+<a href="https://www.buymeacoffee.com/thoralf.brandt" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174">
+</a>
+<br>
+
 ## Highlights
 
 - Internet radio control from a smartphone on the local network

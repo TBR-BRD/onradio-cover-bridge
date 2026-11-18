@@ -13,6 +13,12 @@ Ein Raspberry-Pi-basiertes **Radio- und Infodisplay** mit **Mobile-Webcontroller
 Das System ist für einen Raspberry Pi 3 mit offiziellem 7-Zoll-Display als dauerhaft laufendes Kiosk-Display im Heimnetz gedacht.  
 Die Steuerung erfolgt komfortabel über ein iPhone oder ein anderes Smartphone im gleichen WLAN.
 
+<br>
+<a href="https://www.buymeacoffee.com/thoralf.brandt" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174">
+</a>
+<br>
+
 ## Highlights
 
 - Internetradio-Steuerung per Smartphone im Heimnetz
